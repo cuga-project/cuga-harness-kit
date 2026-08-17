@@ -1,0 +1,16 @@
+# {{PLACEHOLDER: replace "my_agent" comment with the agent name from the spec}}
+# Single-agent configuration. Only MCP servers are declared here.
+# All tools from all servers are loaded into one CugaAgent.
+#
+# KNOWLEDGE BASE / RAG RULE: The agent always has enable_knowledge=True (see agent_entrypoint.py).
+# If the source system has a knowledge base, vector store, or document index, do NOT create
+# a custom MCP server for it — CUGA's native knowledge engine handles retrieval automatically.
+# Only add an MCP server for knowledge access if the source uses a non-standard retrieval
+# protocol that CUGA's knowledge engine cannot cover.
+
+mcp_servers:
+  # {{PLACEHOLDER: add one entry per MCP server in the spec — omit this block entirely if no external tools}}
+  - name: my_data_server  # {{PLACEHOLDER: replace with mcp_server.name from spec}}
+    url: http://localhost:8114/sse  # {{PLACEHOLDER: replace with mcp_server.url from spec}}
+    description: >  # {{PLACEHOLDER: replace with mcp_server.description from spec}}
+      Data query tools for the primary data source.

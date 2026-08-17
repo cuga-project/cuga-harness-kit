@@ -1,0 +1,7 @@
+.claude/settings.local.json
+# migration_from/ is not git-tracked but is explicitly un-ignored.
+# Do not use `git add .` — add specific files only.
+!migration_from/
+migration_to/.env
+.env
+.DS_Store

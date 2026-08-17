@@ -1,0 +1,84 @@
+# {{PLACEHOLDER: replace "my_supervisor" with the supervisor name from the spec}}
+#
+# ARCHITECTURE: CUGA SUPERVISOR ORCHESTRATING EXTERNAL A2A-WRAPPED AGENTS
+#
+# Goal: CugaSupervisor acts as the orchestration layer. All computation is
+# delegated to external agents that run as independent services and are
+# exposed via the A2A protocol. The supervisor has no tools/mcp_servers of
+# its own — it only routes requests and synthesizes results. To give the
+# supervisor its own directly-callable tools, `CugaSupervisor.__init__`
+# accepts a `tool_provider=` kwarg (`sdk.py:2971-3048`); pass it in
+# supervisor_entrypoint.py if a spec ever needs that.
+# POLICIES are wired onto this supervisor: since there are no internal
+# CugaAgent sub-agents to hold them, the `cuga_folder=` passed to
+# `CugaSupervisor(...)` in supervisor_entrypoint.py loads `.cuga/` policies
+# (intent guards, playbooks, etc.) directly onto the supervisor itself — see
+# that file for the wiring.
+#
+# Each external agent:
+#   - Runs as a standalone HTTP service (any framework: LangGraph, custom, etc.)
+#   - Exposes the A2A protocol endpoint (AgentCard + JSON-RPC)
+#   - Is registered below with type: external and a2a_protocol config
+#
+# ROUTING: The supervisor LLM reads agent descriptions to decide which
+# sub-agent to call. Write rich, specific descriptions — they are the
+# primary routing signal.
+supervisor:
+  name: my_supervisor  # {{PLACEHOLDER: replace with supervisor name from spec}}
+
+  # special_instructions is injected into the supervisor's system prompt.
+  # Use it for: routing rules between sub-agents, jailbreak/security guards,
+  # and any supervisor-level behavioral guidance.
+  # special_instructions: |
+  #   {{PLACEHOLDER: add routing rules and security guards here}}
+  #
+  # NOTE: only `supervisor.special_instructions` is consumed by `supervisor_entrypoint.py`.
+  # Other keys under `supervisor:` (e.g. `strategy`, `mode`, `model`) are NOT read —
+  # the supervisor LLM defaults to `settings.agent.code.model` from cuga/settings.toml.
+  # Configure the model via the standard CUGA settings/env vars, not this YAML.
+
+# A2A supervisors do not use MCP servers — all tools live inside the sub-agents.
+mcp_servers: []
+
+agents:
+  # ALL agents in this template are type: external — they are NOT CugaAgent instances managed
+  # by this codebase. Each one is an independently deployed service (any framework: LangGraph,
+  # custom Python, etc.) that exposes the A2A protocol. The supervisor connects to them over
+  # HTTP at runtime; it never imports or instantiates them directly.
+  #
+  # {{PLACEHOLDER: add one entry per external A2A agent in the spec}}
+
+  - name: agent_one  # {{PLACEHOLDER: replace with agent name from spec}}
+    type: external   # external = independently deployed A2A service, not a CugaAgent instance
+    description: >
+      {{PLACEHOLDER: Write a rich, specific description. Format:
+        "Performs <capability>.
+         Input: <what it expects — data type, format>.
+         Output: <what it produces — data type, format>.
+         Use this agent for any task involving <trigger keywords>."
+      The supervisor LLM reads this to decide routing — be specific.}}
+      Performs <capability A>.
+      Input: a natural-language task describing <input type>.
+      Output: <output type> with a brief explanation.
+      Use this agent for any task involving <domain A keywords>.
+    a2a_protocol:
+      enabled: true
+      endpoint: http://localhost:8001  # {{PLACEHOLDER: replace with agent_one's A2A endpoint}}
+      transport: http
+      timeout: 30  # {{PLACEHOLDER: adjust timeout for expected task duration}}
+
+  - name: agent_two  # {{PLACEHOLDER: replace with agent name from spec, or remove if only one agent}}
+    type: external   # external = independently deployed A2A service, not a CugaAgent instance
+    description: >
+      {{PLACEHOLDER: Write a rich, specific description for agent_two.}}
+      Performs <capability B>.
+      Input: a natural-language task describing <input type>.
+      Output: <output type>.
+      Use this agent for any task involving <domain B keywords>.
+    a2a_protocol:
+      enabled: true
+      endpoint: http://localhost:8002  # {{PLACEHOLDER: replace with agent_two's A2A endpoint}}
+      transport: http
+      timeout: 30  # {{PLACEHOLDER: adjust timeout for expected task duration}}
+
+  # {{PLACEHOLDER: copy the block above for each additional A2A agent in the spec}}

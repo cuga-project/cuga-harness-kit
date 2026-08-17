@@ -18,6 +18,32 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cuga_harness_kit"]
+# The raw migration kits under migration-skills/{claude,bob} need build-time filtering (drop .git/,
+# test fixtures, settings.json) before they can ship — the build hook below force-includes an
+# already-filtered copy back in under the same path instead. force-include bypasses excludes, so
+# this just stops the *raw*, unfiltered tree from also being swept in by default `packages`
+# inclusion (which would otherwise ship both the raw and the filtered copy side by side).
+exclude = [
+    "/src/cuga_harness_kit/migration-skills",
+]
+
+[tool.hatch.build.targets.wheel.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.sdist.hooks.custom]
+path = "hatch_build.py"
+
+[tool.hatch.build.targets.sdist]
+# Same reasoning as the wheel exclude above, scoped to claude/ and bob/ specifically (Hatchling's
+# default sdist file selection doesn't sweep in migration-skills/cuga-templates/ on its own, so no
+# exclude is needed there — but claude/ and bob/ do need one, since `uv build`'s default sdist ->
+# wheel-from-sdist pipeline hides this: the wheel step only ever sees whatever the sdist already
+# selected. A direct `uv build --wheel` builds from this tree directly and fails without these
+# excludes — force-include collides with the raw, unfiltered copy at the same path.
+exclude = [
+    "/src/cuga_harness_kit/migration-skills/claude",
+    "/src/cuga_harness_kit/migration-skills/bob",
+]
 
 [dependency-groups]
 dev = [

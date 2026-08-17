@@ -1,0 +1,7 @@
+# migration_from/ is not git-tracked by default but is explicitly un-ignored.
+# Do not use `git add .` — add specific files only.
+!migration_from/
+migration_to/.env
+migration_to/data/
+.env
+.DS_Store

@@ -1,0 +1,112 @@
+# {{PLACEHOLDER: replace "my_supervisor" with the supervisor name from the spec}}
+#
+# ARCHITECTURE CONSTRAINTS (verified against SDK):
+# 1. THIS TEMPLATE routes all tool access through sub-agents — the top-level
+#    `mcp_servers:` registry below is only ever wired to individual agents via each
+#    agent's own `mcp_servers: [...]` list (see supervisor_entrypoint.py). Prefer this
+#    for clean routing: sub-agent descriptions are what the supervisor LLM uses to
+#    decide who does what, so giving each capability its own named agent makes routing
+#    legible.
+#    NOTE: `CugaSupervisor.__init__` DOES support giving the supervisor its own direct
+#    tools via a `tool_provider=` kwarg (a `ToolProviderInterface`, NOT a `tools=` list) —
+#    see `sdk.py:2971-3048` docstring: "tool_provider: Optional provider for MCP/external
+#    tools the supervisor calls directly". Those tools are exposed to the supervisor LLM
+#    exactly like `delegate_to_<agent>()` functions (verified at
+#    `cuga_supervisor/nodes/prepare_agents_and_prompt.py:222-236`). This template does
+#    NOT currently wire that up — if the spec genuinely needs supervisor-level tools
+#    (not just another sub-agent), add a `tool_provider=` argument to the
+#    `CugaSupervisor(...)` call in supervisor_entrypoint.py rather than assuming it's
+#    impossible.
+#    special_instructions IS supported on CugaSupervisor — use it for routing rules and
+#    multi-phase workflow guidance (see commented example below).
+# 2. THIS TEMPLATE loads policies (.cuga/) onto each sub-agent (CugaAgent), not the
+#    supervisor — after constructing each internal agent, supervisor_entrypoint.py calls
+#    `await agent.policies.load_from_folder(policies_folder)` directly on it (no
+#    `cuga_folder=`/`auto_load_policies=` constructor kwargs are used here), so every
+#    sub-agent shares the same `.cuga/` folder's policies.
+#    NOTE: `CugaSupervisor.__init__` DOES have its own full policy management —
+#    `cuga_folder`, `auto_load_policies`, `reset_policy_storage`, `filesystem_sync`,
+#    `policy_system` kwargs plus a `.policies` manager property (`sdk.py:2971-3048`,
+#    `PoliciesManager` class). It is NOT limited to routing sub-agents; a supervisor with
+#    no internal sub-agents (see `a2a_supervisor_external/`) loads its own `.cuga/`
+#    policies directly via `cuga_folder=`. If the spec needs supervisor-level policies
+#    (e.g. a jailbreak guard that must run before any sub-agent is even chosen), pass
+#    `cuga_folder=`/`auto_load_policies=True` to `CugaSupervisor(...)` here too, rather
+#    than assuming policies can only live on sub-agents.
+supervisor:
+  name: my_supervisor
+
+  # special_instructions IS read from this YAML and injected into the supervisor's system prompt.
+  # Use it for: routing rules between sub-agents, jailbreak/security guards, and any
+  # supervisor-level behavioral guidance. This is the correct place for playbook-style logic.
+  # special_instructions: |
+  #   {{PLACEHOLDER: add routing rules and security guards here}}
+  #
+  # NOTE: only `supervisor.special_instructions` is consumed by the SDK
+  # (`load_supervisor_config` in cuga/supervisor_utils/supervisor_config.py)
+  # and by `supervisor_entrypoint.py`. Other keys under `supervisor:` (e.g.
+  # `strategy`, `mode`, `model`) are NOT read — the supervisor LLM defaults to
+  # `settings.agent.code.model` from cuga/settings.toml. Configure the model via
+  # the standard CUGA settings/env vars, not this YAML.
+
+# External MCP server registry.
+# knowledge_engine is managed by CUGA runtime — do NOT add it here.
+#
+# KNOWLEDGE BASE / RAG RULE: If a sub-agent needs to search a knowledge base,
+# vector store, or document index, do NOT create a custom MCP server for it.
+# Instead, set enable_knowledge: true on that agent entry (see agents: list below).
+# The CUGA runtime will wire up its native knowledge engine automatically.
+# Only use an MCP server for knowledge access if the source system uses a
+# non-standard retrieval protocol that CUGA's knowledge engine cannot cover.
+mcp_servers:
+  # {{PLACEHOLDER: add one entry per MCP server in the spec}}
+  - name: my_data_server  # {{PLACEHOLDER: replace with mcp_server.name from spec}}
+    url: http://localhost:8114/sse  # {{PLACEHOLDER: replace with mcp_server.url from spec}}
+    description: >  # {{PLACEHOLDER: replace with mcp_server.description from spec}}
+      Data query tools for the primary data source.
+
+agents:
+  # {{PLACEHOLDER: add one entry per agent in the spec}}
+
+  # Example: data-fetching agent
+  - name: data_agent  # {{PLACEHOLDER: replace with agent.name from spec}}
+    type: internal
+    description: >
+      Fetches raw data from the primary data source.
+      Input: record identifier (required). Section type (optional).
+      Output: JSON object with fetched data sections.
+      # {{PLACEHOLDER: write a rich description matching agent.description from spec.
+      #   Format: "Input: <what it expects>  Output: <what format it produces>"
+      #   This description is used by the supervisor LLM for routing — be specific.}}
+    special_instructions: |
+      # {{PLACEHOLDER: write special_instructions from agent.special_instructions in spec,
+      #   or derive from the agent's role. Include: YOUR ROLE, IMPORTANT RULES, OUTPUT FORMAT.}}
+      You are a data-fetching agent. Return raw JSON only. Do not format data.
+    mcp_servers:
+      - my_data_server  # {{PLACEHOLDER: list the MCP server names this agent uses}}
+    # enable_knowledge: false  # {{PLACEHOLDER: set to true if this agent searches a knowledge base / RAG store}}
+
+  # Example: knowledge-search agent (uses CUGA native knowledge engine — no MCP server needed)
+  # - name: search_agent
+  #   type: internal
+  #   description: >
+  #     Searches the knowledge base for relevant documentation or runbooks.
+  #     Input: natural-language query string.
+  #     Output: retrieved passages with source references.
+  #   special_instructions: |
+  #     You are a knowledge search agent. Search the knowledge base and return relevant passages verbatim.
+  #   mcp_servers: []
+  #   enable_knowledge: true  # activates CUGA native knowledge engine — no MCP server needed
+
+  # Example: formatting agent
+  - name: formatter_agent  # {{PLACEHOLDER: replace with agent.name from spec}}
+    type: internal
+    description: >
+      Formats raw JSON data as structured output.
+      Input: the complete JSON string from data_agent must be embedded in the task message.
+      Output: formatted text according to domain guidelines.
+      # {{PLACEHOLDER: write a rich description matching agent.description from spec}}
+    special_instructions: |
+      # {{PLACEHOLDER: write special_instructions from spec}}
+      You format data as structured output. Return only formatted text — no JSON wrappers.
+    mcp_servers: []

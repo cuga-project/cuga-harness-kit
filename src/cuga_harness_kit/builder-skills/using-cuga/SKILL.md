@@ -31,9 +31,24 @@ For environment-based setup, use the installed provider settings and this refere
 
 Keep provider credentials on the application's Python backend or CUGA server; a browser UI calls that backend/server and must not receive the provider key. Keep `.env` and config files containing credentials out of Git. Check configuration presence without displaying secrets. A present key, successful import, or constructed model does not establish that authentication and inference work.
 
+### Enable the tracker and set trajectory storage
+
+When creating a `.env` for a local SDK app or local managed server, include these settings alongside the chosen provider configuration. For an existing `.env`, add missing settings without replacing credentials or intentional user overrides.
+
+```env
+DYNACONF_ADVANCED_FEATURES__TRACKER_ENABLED=true
+CUGA_LOGGING_DIR="./.cuga/logging"
+```
+
+The tracker flag is a Dynaconf setting. The directory uses `CUGA_LOGGING_DIR`, not a Dynaconf trajectory-path setting: CUGA stores trajectories under `<CUGA_LOGGING_DIR>/trajectory_data`. The relative example assumes launch from the project root; use an absolute writable path when the working directory can change. Keep the chosen logging directory out of Git (add `.cuga/logging/` to `.gitignore` for this example).
+
+Load `.env` into the process environment **before importing CUGA**: the reviewed runtime resolves logging paths before its internal dotenv loader runs. Use `uv run --env-file .env python app.py` for an SDK app or `uv run --env-file .env cuga start manager` for a local managed server; an application bootstrap can instead call `load_dotenv()` before any CUGA import. Exported shell/service variables take precedence over `.env`; check conflicting tracker/path values if verification still shows tracking disabled or the wrong directory. Restart an already-running process after changing these settings. For a remote managed-server client, trajectory storage belongs on the server; do not create local tracker configuration merely to connect.
+
+Verify `settings.advanced_features.tracker_enabled` is true and `cuga.config.TRAJECTORY_DATA_DIR` resolves to the intended writable directory. After the first agent run, confirm a trajectory file was actually written there; the direct model readiness check below does not produce an agent trajectory.
+
 ### Verify a model request
 
-For the local environment-based path, run this Python example from the project environment (`uv run python llm_smoke.py` after saving it). It uses the same model factory and code-model settings as the SDK, including configured provider timeouts. For an explicit SDK `model=`, test that actual instance instead. For an existing managed server, use `cuga-managed-server` to test the selected agent through its UI/HTTP API: use draft chat when configuring a draft with manage access, or the existing published agent when the user only has chat/API access. Do not require admin credentials for a client-only integration. A local factory check does not verify a server's saved LLM config, and a readiness check must not publish or replace that config.
+For the local environment-based path, run this Python example from the project environment (`uv run --env-file .env python llm_smoke.py` after saving it). It uses the same model factory and code-model settings as the SDK, including configured provider timeouts. For an explicit SDK `model=`, test that actual instance instead. For an existing managed server, use `cuga-managed-server` to test the selected agent through its UI/HTTP API: use draft chat when configuring a draft with manage access, or the existing published agent when the user only has chat/API access. Do not require admin credentials for a client-only integration. A local factory check does not verify a server's saved LLM config, and a readiness check must not publish or replace that config.
 
 ```python
 import asyncio

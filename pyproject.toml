@@ -1,6 +1,6 @@
 [project]
 name = "cuga-harness-kit"
-version = "0.1.3"
+version = "0.1.4"
 description = "Scaffolds Claude Code / Cursor / Codex skills that teach coding agents to build with the cuga framework"
 readme = "README.md"
 license = "Apache-2.0"

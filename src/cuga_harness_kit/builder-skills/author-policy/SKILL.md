@@ -1,179 +1,150 @@
 ---
 name: cuga-author-policy
-description: Use when the user wants to govern agent behavior with a cuga policy - block/redirect an intent, add step-by-step playbook guidance, require approval before a tool runs, enhance a tool's description, or reshape agent output format.
+description: Use when the user wants to govern agent behavior with a cuga policy - block/redirect an intent, add playbook guidance, require tool approval, enhance tool descriptions, or reshape output. Covers SDK/file policies and routes managed config to cuga-managed-server.
 ---
 
 # Authoring a cuga policy
 
-A cuga **policy** is a rule the runtime enforces on a `CugaAgent`, unlike a runtime *skill* (`cuga-build-cuga-skill`) which the agent optionally chooses to load. There are 5 policy types.
+Choose the execution path before saving a policy:
 
-## Step 1 — identify which type
-
-| The user wants to... | Type |
+| Path | How to apply the policy |
 |---|---|
-| Block or redirect a specific kind of request | `intent_guard` |
-| Give the agent step-by-step guidance for a workflow | `playbook` |
-| Require human approval before a tool runs | `tool_approval` |
-| Add usage guidance/examples to a tool's description | `tool_guide` |
-| Reshape the agent's response into JSON/table/markdown/etc. | `output_formatter` |
+| SDK | `await agent.policies.add_*`, or `await agent.policies.load_from_folder(".cuga")` |
+| File-based SDK/project | Correct `.cuga/` subfolder; enable `auto_load_policies` or explicitly load the folder |
+| Managed server | Save policies in the agent's draft config, test, then publish; see `cuga-managed-server` |
 
-## Step 2 — pick programmatic SDK or markdown file
+Manager mode disables policy filesystem sync. Writing a markdown file and restarting/re-publishing does not import that file into managed config. Markdown frontmatter is a file-loader contract; managed JSON uses serialized policy models (a list of trigger objects, not the file's trigger mapping).
 
-**Programmatic (recommended for code you already control):** attach at agent construction time via `agent.policies`:
+## Choose the type
+
+| Requirement | Type | File directory |
+|---|---|---|
+| Block or redirect requests | `intent_guard` | `.cuga/intent_guards/` |
+| Give workflow guidance | `playbook` | `.cuga/playbooks/` |
+| Require tool approval | `tool_approval` | `.cuga/tool_approvals/` |
+| Add tool guidance | `tool_guide` | `.cuga/tool_guides/` |
+| Shape responses | `output_formatter` | `.cuga/output_formatters/` |
+
+Playbooks and tool guides inject instructions; verify the actual tool calls and output. An intent guard blocks matching requests; tool approval pauses matching tool execution.
+
+## SDK example
 
 ```python
-await agent.policies.add_intent_guard(
-    name="Block Delete Operations",
-    description="Prevents deletion of critical data",
-    keywords=["delete", "remove", "erase"],
-    response="Deletion operations are not permitted for security reasons.",
-    priority=100,  # higher = checked first
-)
+import asyncio
+from cuga import CugaAgent
 
-await agent.policies.add_playbook(
-    name="Budget Analysis Workflow",
-    description="Multi-step process for analyzing financial budgets",
-    natural_language_trigger=["When user asks to analyze their budget"],
-    content="# Budget Analysis Workflow\n\n## Step 1: ...",
-    priority=50,
-)
+async def main():
+    agent = CugaAgent(enable_knowledge=False, auto_load_policies=False, filesystem_sync=False)
+    try:
+        policy_id = await agent.policies.add_intent_guard(
+            name="Block Delete Operations",
+            keywords=["delete", "remove", "erase"],
+            response="Deletion operations are not permitted for security reasons.",
+            priority=100,
+        )
+        assert policy_id
+        result = await agent.invoke("delete all records")
+        assert not result.error, result.error
+        assert result.answer == "Deletion operations are not permitted for security reasons."
+        assert any(d.policy_id == policy_id for d in result.policy_decisions)
+    finally:
+        await agent.aclose()
+
+asyncio.run(main())
 ```
 
-**Markdown file (for the `manager` web UI, or policies you want checked into a project):** save a file with YAML frontmatter + markdown body to the matching `.cuga/` subfolder, then restart or re-publish so it's picked up:
+For guidance: `await agent.policies.add_playbook(name="Budget Analysis", keywords=["budget"], content="# Budget Analysis\n\n1. Read the budget.\n2. Calculate totals.")`. Higher priority is checked first. Configure the LLM and embedding provider before running; keyword examples avoid semantic matching but policy storage still needs embeddings.
 
-| Type | Save to |
-|---|---|
-| `playbook` | `.cuga/playbooks/playbook_<name>.md` |
-| `intent_guard` | `.cuga/guards/guard_<name>.md` |
-| `tool_guide` | `.cuga/guides/guide_<name>.md` |
-| `tool_approval` | `.cuga/approvals/approval_<name>.md` |
-| `output_formatter` | `.cuga/formatters/formatter_<name>.md` |
+## File templates
 
-Shared frontmatter fields across all 5 types: `id`, `name`, `description`, `enabled`, `priority`, `type`, `triggers` (shape varies by type — see below).
+Save each entire fenced block, including frontmatter and body, to a `.md` file in the listed directory. Body text supplies playbook instructions, guard responses, tool guidance and formatter config. `triggers.keywords` is literal matching; `triggers.natural_language` is semantic matching with a threshold. Tool guide/approval targets come from `target_tools` / `required_tools`, not `triggers.tool_match`.
 
-## Mode: Playbook
+### Playbook — `.cuga/playbooks/budget.md`
 
-```yaml
+```markdown
 ---
-description: Brief description of what this playbook does
-enabled: true
-id: playbook_<unique_id>
-name: <Playbook Name>
-priority: 50
-triggers:
-  natural_language:
-  - keyword 1
-  - keyword phrase
-  target: intent
-  threshold: 0.5
+id: playbook_budget
+name: Budget Analysis Workflow
 type: playbook
----
-# <Title>
-## Overview
-## Parameters
-- **parameter_name** (required/optional): description
-## Steps
-### 1. <Step Name> — constraints: MUST / SHOULD / MAY
-## Examples
-## Troubleshooting
-## Best Practices
-```
-
-## Mode: Intent Guard
-
-```yaml
----
-description: Description of what intents this guard blocks
+priority: 50
 enabled: true
-id: guard_<unique_id>
-name: <Guard Name>
-priority: 90        # 90-100 recommended: guards should win priority ties
 triggers:
-  natural_language:
-  - blocked intent 1
+  keywords: [budget]
   target: intent
-  threshold: 0.7     # strict matching for guards
+---
+# Budget Analysis Workflow
+
+1. Read the budget.
+2. Calculate totals and explain assumptions.
+```
+
+### Intent Guard — `.cuga/intent_guards/delete.md`
+
+```markdown
+---
+id: guard_delete
+name: Block Delete Operations
 type: intent_guard
-intent_examples:
-- 5+ example phrases of the blocked intent, for matching
-response:
-  response_type: natural_language   # natural_language | json | template
-  content: |
-    Custom message explaining why this is blocked + alternatives.
-allow_override: false   # true = user can bypass, false = enforced
+priority: 100
+enabled: true
+triggers:
+  keywords: [delete, remove, erase]
+  target: intent
+response_type: natural_language
+allow_override: false
 ---
+Deletion operations are not permitted for security reasons.
 ```
 
-## Mode: Tool Guide
+### Tool Guide — `.cuga/tool_guides/lookup.md`
 
-```yaml
+```markdown
 ---
-description: Enhanced guidance for specific tools
-enabled: true
-id: guide_<unique_id>
-name: <Guide Name>
-priority: 50
-triggers:
-  tool_match:
-  - tool_name_1
-  target: tools
+id: guide_lookup
+name: Order Lookup Guidance
 type: tool_guide
-target_tools: [tool_name_1, tool_name_2]   # or target_apps: [app_name] for all tools in an app
-guide_content: |
-  ## When to Use / Best Practices / Common Pitfalls / Parameter Guidelines / Examples / Related Tools
-prepend: false   # true = insert before the tool's own description, false = after
+target_tools: [lookup_order]
+prepend: false
 ---
+Use lookup_order with the exact order_id supplied by the user.
 ```
 
-## Mode: Tool Approval
+### Tool Approval — `.cuga/tool_approvals/delete.md`
 
-```yaml
+```markdown
 ---
-description: Require approval for sensitive operations
-enabled: true
-id: approval_<unique_id>
-name: <Approval Policy Name>
-priority: 100   # highest priority recommended
-triggers:
-  tool_match: [sensitive_tool_1]
-  target: tools
+id: approval_delete
+name: Approve Deletion
 type: tool_approval
-required_tools: [sensitive_tool_1]     # or required_apps: [app_name]
-approval_message: |
-  Explain why approval is required and what will happen.
+required_tools: [delete_record]
 show_code_preview: true
-auto_approve_after: null   # null = never auto-approve (recommended); or seconds e.g. 30/60/300
+auto_approve_after: null
 ---
+This will delete a record. Confirm before continuing.
 ```
 
-## Mode: Output Formatter
+### Output Formatter — `.cuga/output_formatters/summary.md`
 
-```yaml
+```markdown
 ---
-description: Format output in a specific structure
-enabled: true
-id: formatter_<unique_id>
-name: <Formatter Name>
-priority: 50
-triggers:
-  natural_language: [format keyword 1]
-  target: agent_response   # must be agent_response for formatters
-  threshold: 0.6
+id: formatter_summary
+name: JSON Summary
 type: output_formatter
-format_type: json   # json | markdown | table | csv | custom
-format_config: |
-  {"schema": {"type": "object", "properties": {"field1": {"type": "string"}}, "required": ["field1"]}}
+triggers:
+  always: true
+format_type: json_schema
 ---
+{"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}
 ```
 
-## Testing
+The file loader accepts `format_type: markdown`, `json_schema`, or `direct`; the body is `format_config`. Do not use `format_type: json` or put formatter/guide/guard content only in frontmatter.
 
-```bash
-uv run cuga start competition --local
-```
+## Verify before claiming success
 
-Trigger the policy with matching keywords/intent and confirm the expected block/guidance/approval/format behavior shows up.
+For SDK file loading, inspect `loaded = await agent.policies.load_from_folder(".cuga")`; require `loaded["count"]` to match the number of intended files and `loaded["errors"]` to be empty. Confirm `await agent.policies.list()` contains their IDs. Run a positive and a negative trigger example. For approvals, confirm interruption and resume on the same `thread_id` with `action_response` (SDK) or the server's documented approval payload. For formatters, parse/validate the returned JSON, not just the prompt.
+
+For manager, check draft behavior and production behavior separately, including `policy_errors` and `status: partial` in API responses. Publish the full tested config; a successful save alone does not prove a policy loaded.
 
 ## Reference
 
-Full worked templates: `docs/starterkit/.cursor/{intent_guard,playbook,tool_guide,tool_approval,output_formatter}.md` in the cuga-agent repo. Policy data models: `src/cuga/backend/cuga_graph/policy/models.py`. SDK docs: https://docs.cuga.dev/docs/sdk/policies/
+Implementation contracts in cuga-agent: `src/cuga/backend/cuga_graph/policy/folder_loader.py`, `models.py`, `src/cuga/sdk.py`, and `src/cuga/backend/server/manage_routes/`. Inspect `uv run cuga policy --help` for storage-level CLI commands; managed config changes belong in the Manage API/UI.

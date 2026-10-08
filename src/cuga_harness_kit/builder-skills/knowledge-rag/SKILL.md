@@ -5,9 +5,11 @@ description: Use when the user wants a cuga agent to ingest, search, or answer q
 
 # Knowledge base (RAG)
 
-cuga has a built-in knowledge base: local vector store + **Docling** for parsing/normalizing documents before chunking and embedding, so ingestion stays self-contained with no external document service.
+cuga has a built-in knowledge base: configurable vector/metadata storage (local by default) + **Docling** for parsing/normalizing documents before chunking and embedding, for the default parsing path. Hosted embedding/LLM providers need credentials, and local providers may download models on first use.
 
-Knowledge is **enabled by default** (`enable_knowledge=True`); the SDK auto-injects knowledge tools/awareness so the agent knows what's available and how to search it.
+The SDK follows installed settings when `enable_knowledge=None`; use `enable_knowledge=True` explicitly for this workflow. When enabled, the SDK auto-injects knowledge tools/awareness so the agent knows what's available and how to search it.
+
+This example uses the embedded SDK. For a managed server, configure knowledge and upload documents through Manage/server APIs on the selected agent; use `cuga-managed-server`. Publishing config does not import SDK-process documents into that server.
 
 ## Try it
 
@@ -23,20 +25,23 @@ Full walkthrough with sample docs: `docs/examples/knowledge_demo/` in a cuga-age
 from cuga import CugaAgent
 import asyncio
 
-agent = CugaAgent(enable_knowledge=True)
-
 async def main():
-    await agent.knowledge.ingest("/path/to/quarterly_report.pdf")
+    agent = CugaAgent(enable_knowledge=True)
+    try:
+        await agent.knowledge.ingest("/path/to/quarterly_report.pdf")  # replace with an existing file
 
-    result = await agent.invoke("What does the report say about Q4 revenue?")
-    print(result.answer)  # agent searches the knowledge base automatically
+        result = await agent.invoke("What does the report say about Q4 revenue?")
+        if result.error:
+            raise RuntimeError(result.error)
+        print(result.answer)  # agent searches the knowledge base automatically
 
-    results = await agent.knowledge.search("Q4 revenue figures")
-    for r in results:
-        print(f"{r['filename']} (page {r['page']}): {r['text'][:100]}")
+        results = await agent.knowledge.search("Q4 revenue figures")
+        for r in results:
+            print(f"{r['filename']} (page {r.get('page', '?')}): {r['text'][:100]}")
 
-    docs = await agent.knowledge.list_documents()
-    await agent.aclose()
+        docs = await agent.knowledge.list_documents()
+    finally:
+        await agent.aclose()
 
 asyncio.run(main())
 ```
@@ -57,7 +62,7 @@ Use `session` scope for per-conversation uploads that shouldn't leak between use
 ## Disabling
 
 ```python
-agent = CugaAgent(tools=[my_tools], enable_knowledge=False)
+agent = CugaAgent(enable_knowledge=False)
 ```
 
 ## Supported types & tuning

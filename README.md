@@ -14,7 +14,7 @@ The assistant will install this kit, scaffold the cuga guidance files, then sugg
 
 1. `uv add cuga` — add cuga to your project.
 2. Create a `.env` — use `docs/cuga-env-api-keys.md` for your LLM provider.
-3. `uv run cuga start demo` — launch the demo UI.
+3. Choose a path: `uv run cuga start demo` for examples, `uv run cuga start manager` for draft/publish configuration, or embed `CugaAgent` in Python.
 4. Ask *"help me build a cuga tool"* or *"how do I add a policy"* when you're ready to build.
 
 ## Manual install
@@ -43,7 +43,8 @@ Run `init` from an empty new project you're starting from scratch, or from insid
 |---|---|
 | `getting-started` | Entry point — routes to the right skill below. |
 | `install-and-launch` | `uv init`, `uv add cuga`, `.env` API keys, `uv run cuga start <mode>`. |
-| `build-agent` | `CugaAgent` / `CugaSupervisor` SDK basics. |
+| `build-agent` | Embedded `CugaAgent` / `CugaSupervisor` SDK basics. |
+| `managed-server` | Manage UI/HTTP draft → test → publish config; production invocation. |
 | `build-cuga-skill` | Authoring cuga's own **runtime** skills — not the same as the IDE-assistant skills in this repo. |
 | `build-tool` | Registering a LangChain / OpenAPI / MCP tool. |
 | `author-policy` | Intent guards, playbooks, tool approval/guides, output formatters. |
@@ -110,6 +111,8 @@ cd my-cuga-app
 uv add cuga
 ```
 
+The SDK configures an agent in your Python process. The managed server reads per-agent draft and published versions from its config store. SDK tools/policies and `.cuga/` files do not automatically update managed config; use the managed-server skill for that workflow.
+
 For API keys and provider settings, see [`docs/env-api-keys.md`](docs/env-api-keys.md).
 
 ## Development
@@ -118,3 +121,5 @@ For API keys and provider settings, see [`docs/env-api-keys.md`](docs/env-api-ke
 uv sync
 uv run pytest
 ```
+
+For the runtime-backed builder checks and their coverage limits, see [builder validation](docs/builder-validation.md).

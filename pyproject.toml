@@ -49,3 +49,9 @@ exclude = [
 dev = [
     "pytest>=8.0",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: isolated harness checks",
+    "integration: opt-in checks against an installed CUGA runtime",
+]

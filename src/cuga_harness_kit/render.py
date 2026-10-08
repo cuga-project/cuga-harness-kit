@@ -15,7 +15,8 @@ from pathlib import Path
 import yaml
 
 _FRONTMATTER_RE = re.compile(r"\A---\n(.*?)\n---\n(.*)", re.DOTALL)
-_HEADING_RE = re.compile(r"^(#{1,5})(\s)", re.MULTILINE)
+_HEADING_RE = re.compile(r"^(#{1,5})(\s)")
+_FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})(.*)$")
 
 
 def parse_skill_md(skill_md_path: Path) -> tuple[dict, str]:
@@ -43,5 +44,26 @@ def render_mdc(skill_md_path: Path) -> str:
 def render_agents_section(skill_md_path: Path) -> str:
     """SKILL.md -> one '## <name>' section for AGENTS.md, headings demoted one level."""
     frontmatter, body = parse_skill_md(skill_md_path)
-    demoted = _HEADING_RE.sub(r"#\1\2", body)
+    # Code fences contain runnable Python, YAML and runtime skill templates.
+    # Demoting their headings changes the example rather than its presentation.
+    lines = []
+    fence_char = None
+    fence_length = 0
+    for line in body.splitlines(keepends=True):
+        fence = _FENCE_RE.match(line)
+        if fence_char is None:
+            if fence:
+                fence_char = fence[1][0]
+                fence_length = len(fence[1])
+            else:
+                line = _HEADING_RE.sub(r"#\1\2", line)
+        elif (
+            fence
+            and fence[1][0] == fence_char
+            and len(fence[1]) >= fence_length
+            and not fence[2].strip()
+        ):
+            fence_char = None
+        lines.append(line)
+    demoted = "".join(lines)
     return f"## {frontmatter['name']}\n\n_{frontmatter['description']}_\n\n{demoted}\n"

@@ -12,12 +12,22 @@ This skill is the entry point. Read the description of the skill that matches wh
 | User is trying to... | Use skill |
 |---|---|
 | Install cuga or start the demo UI | `cuga-install-and-launch` |
+| Configure a managed server, test a draft, publish config, or call HTTP APIs | `cuga-managed-server` |
 | Write Python code that creates/invokes a `CugaAgent` or `CugaSupervisor` | `cuga-build-agent` |
 | Author a new **runtime** skill the agent itself can load (`.cuga/skills/<name>/SKILL.md`) | `cuga-build-cuga-skill` |
 | Register a Python function, OpenAPI spec, or MCP server as a callable tool | `cuga-build-tool` |
 | Add a policy: block an intent, add a playbook, require approval, enhance a tool description, or reshape output | `cuga-author-policy` |
 | Ingest/search documents (RAG) | `cuga-knowledge-rag` |
 | An agent run misbehaved and you need to inspect why | `cuga-debug-trajectory` |
+
+## Choose the execution path first
+
+| Path | Source of configuration | Next skill |
+|---|---|---|
+| Embedded Python SDK | Your `CugaAgent` / `CugaSupervisor` construction, tools and policy calls | `cuga-build-agent` |
+| Managed server | Per-agent draft and published versions in the config store; Manage UI / HTTP APIs | `cuga-managed-server` |
+
+Ask which path the user needs if it is unclear. Demo presets are examples; SDK code does not automatically configure the managed server. In manager mode, editing `.cuga/` files or the package's registry YAML does not update the saved config. Read the matching skill's full instructions, not just its description.
 
 ## Two different meanings of "skill"
 

@@ -36,7 +36,7 @@ uv run cuga start <service>
 
 Valid `<service>` values: `demo`, `demo_skills`, `demo_crm`, `demo_docs`, `demo_health`, `demo_knowledge`, `demo_supervisor`, `travel_agent`, `manager`, `registry`, `appworld`.
 
-- `demo` / `demo_crm` / `demo_supervisor` / `demo_knowledge` / `demo_docs` — launch the chat web UI at `https://localhost:7860` plus a tool registry service on port 8001, each preset wiring up different sample tools (CRM+email, multi-agent supervisor, RAG knowledge, docs) so you can try the matching capability immediately.
+- `demo` / `demo_crm` / `demo_supervisor` / `demo_knowledge` / `demo_docs` — launch the chat web UI at `http://localhost:7860` (HTTPS when SSL certificates are configured) plus a tool registry service on port 8001, each preset wiring up different sample tools (CRM+email, multi-agent supervisor, RAG knowledge, docs) so you can try the matching capability immediately.
 - `demo_skills` — same UI, with cuga's own runtime skill-loading enabled (see `cuga-build-cuga-skill`).
 - `manager` — a draft/publish UI: edit agent config (tools, MCP servers, LLM, policies) as a draft, try it, then publish a versioned config for production chat.
 - `registry` — just the tool registry service (OpenAPI/MCP config), no chat UI.
@@ -45,11 +45,11 @@ Valid `<service>` values: `demo`, `demo_skills`, `demo_crm`, `demo_docs`, `demo_
 Other useful commands:
 - `cuga stop <service>` — stop a running service.
 - `cuga status` — show what's currently running.
-- `cuga doctor` — environment/dependency sanity check.
+- `cuga doctor` — GPU stack diagnosis; use CLI help and import checks for general setup problems.
 - `cuga viz` — trajectory viewer dashboard (see `cuga-debug-trajectory`).
 
-There is no `cuga policy` or `cuga knowledge` CLI subcommand — policies and knowledge are managed through the Python SDK (`agent.policies.*`, `agent.knowledge.*`, see `cuga-author-policy` / `cuga-knowledge-rag`) or through the `manager` web UI.
+Current CUGA exposes `cuga policy` and `cuga knowledge`; inspect `uv run cuga policy --help` and `uv run cuga knowledge --help` for the installed version. The policy CLI operates on policy storage; do not assume it updates a managed agent's draft/published config. `cuga knowledge` includes config export/import and adaptation/glossary commands that can target a server. See `cuga-managed-server` for the draft → test → publish workflow.
 
 ## Next step
 
-Once the UI is up, point the user at `cuga-build-agent` for writing their own Python code against the SDK, or have them just chat with the demo agent directly in the browser.
+For embedded Python code use `cuga-build-agent`. For managed deployment use `cuga-managed-server`; test the draft and publish before checking production chat. Verify service/flag availability with `uv run cuga start --help` for the installed version.

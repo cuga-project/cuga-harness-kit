@@ -45,7 +45,11 @@ Name validation: no path separators or `..` in `name` — cuga sanitizes/rejects
 uv run cuga start demo_skills
 ```
 
-Runs with `[advanced_features] sandbox_mode = "native"` by default. For sandboxed execution instead: `uv sync --extra opensandbox` then use the `opensandbox` mode, or `uv sync --group sandbox` + `uv run cuga start demo --sandbox` with `[skills]` enabled for Docker/Podman isolation.
+The executor follows the installed sandbox settings; inspect `[advanced_features] sandbox_mode` and the service startup output. For an installed app, add the optional dependency with `uv add "cuga[opensandbox]"` and configure a running OpenSandbox service. In a cuga-agent source checkout, `uv sync --extra opensandbox` enables that extra; the repository's `uv sync --group sandbox` is a separate development setup for Docker/Podman. Inspect `uv run cuga start --help` and the installed sandbox settings before choosing flags; do not assume a consumer project defines the repository's dependency groups.
+
+## SDK and managed server
+
+In the SDK, opt in with `CugaAgent(enable_skills=True, skills_folder="/absolute/path/to/.cuga")`. The folder contains `skills/`, not the skill file itself. Skills also require the matching shell/executor configuration. For manager, enable skills in the server settings/environment (`DYNACONF_SKILLS__ENABLED=true`) and mount the selected skills directory in the server's workspace. Publish config does not upload skill folders. Check discovery and an actual `load_skill` result after restarting.
 
 ## Installing a ready-made skill
 

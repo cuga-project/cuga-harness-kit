@@ -5,6 +5,8 @@ description: Use when the user wants to write Python code that creates or invoke
 
 # Building with the CugaAgent SDK
 
+This path embeds CUGA in your Python process. It does not publish configuration to `cuga start manager`; for that use `cuga-managed-server`. Configure your provider using `docs/cuga-env-api-keys.md` first. A model is required for agent reasoning even when tools are local.
+
 ## Single agent
 
 ```python
@@ -17,11 +19,16 @@ def add_numbers(a: int, b: int) -> int:
     """Add two numbers together"""
     return a + b
 
-agent = CugaAgent(tools=[add_numbers])
-
 async def main():
-    result = await agent.invoke("What is 5 + 3?")
-    print(result.answer)
+    agent = CugaAgent(tools=[add_numbers], enable_knowledge=False)
+    try:
+        result = await agent.invoke("What is 5 + 3?", track_tool_calls=True)
+        if result.error:
+            raise RuntimeError(result.error)
+        print(result.answer)
+        print(result.tool_calls)  # verify add_numbers actually ran
+    finally:
+        await agent.aclose()
 
 asyncio.run(main())
 ```
@@ -31,7 +38,7 @@ Key points:
 - `await agent.invoke(message, thread_id=...)` — `thread_id` isolates conversation state per user/session; omit it for a one-off call.
 - `agent.stream()` gives real-time execution events instead of a single final result.
 - `agent.policies` is the entry point for attaching Intent Guard / Playbook / Tool Approval / Tool Guide / Output Formatter policies programmatically — see `cuga-author-policy`.
-- Knowledge/RAG is on by default (`enable_knowledge=True`) — see `cuga-knowledge-rag`; pass `enable_knowledge=False` to turn it off.
+- `enable_knowledge=None` follows the installed settings; use `True` or `False` explicitly when needed. For Knowledge/RAG see `cuga-knowledge-rag`; pass `enable_knowledge=False` to turn it off.
 - The underlying LangGraph graph is reachable for advanced use cases (custom nodes, inspecting state) if the simple API isn't enough.
 
 ## Multi-agent (CugaSupervisor)
@@ -52,15 +59,22 @@ def send_email(to: str, body: str) -> str:
     return f"Email sent to {to}"
 
 async def main():
-    crm_agent = CugaAgent(tools=[get_customers])
+    crm_agent = CugaAgent(tools=[get_customers], enable_knowledge=False)
     crm_agent.description = "CRM and customer data"
 
-    email_agent = CugaAgent(tools=[send_email])
+    email_agent = CugaAgent(tools=[send_email], enable_knowledge=False)
     email_agent.description = "Sending emails and notifications"
 
     supervisor = CugaSupervisor(agents={"crm": crm_agent, "email": email_agent})
-    result = await supervisor.invoke("Get our top customer and email them a thank-you")
-    print(result.answer)
+    try:
+        result = await supervisor.invoke("Get our top customer and email them a thank-you")
+        if result.error:
+            raise RuntimeError(result.error)
+        print(result.answer)
+    finally:
+        await supervisor.aclose()
+        await crm_agent.aclose()
+        await email_agent.aclose()
 
 asyncio.run(main())
 ```
@@ -68,7 +82,7 @@ asyncio.run(main())
 - Each sub-agent needs a `.description` — the supervisor uses it to decide who handles what.
 - Mix local `CugaAgent`s with remote agents via A2A: pass an `"agent_name": {"type": "external", "description": "...", "config": {"a2a_protocol": {...}}}` entry in `agents=`.
 - Pass data between sub-agents with `variables=["var_name"]`.
-- `CugaSupervisor.from_yaml("path/to/config.yaml")` loads agents from a config file instead of constructing them in code.
+- `await CugaSupervisor.from_yaml("path/to/config.yaml")` loads agents from a config file instead of constructing them in code.
 - Try it live first: `uv run cuga start demo_supervisor` (see `cuga-install-and-launch`).
 
 ## Reference

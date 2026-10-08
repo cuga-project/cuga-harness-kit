@@ -39,13 +39,14 @@ services:
   - orders:
       url: http://localhost:9000/openapi.json
       description: Order service
-      include: [lookupOrder]
 mcpServers:
   orders_mcp:
     url: http://localhost:9001/mcp
     transport: http
     description: Order lookup tools
 ```
+
+Supply a nonempty description for each service/app. For managed OpenAPI in v0.4.0, omit `include` unless its behavior is verified: the registry filters by exact operation IDs and the agent provider filters the same values by callable names/suffixes. These names can differ, leaving no tools available. Expose a restricted service if only selected operations may be available. For MCP, `include` must match original server tool names and agent callable suffixes at both filtering layers; e.g. `lookup_order` works when that is the original name and suffix. Full app-prefixed names fail registry filtering, and sanitization can also cause mismatches. Omit `include` when incompatible and restrict the server itself; verify execution after saving.
 
 In manager mode, configure tools through Manage or the draft API, test, then publish (`cuga-managed-server`). Its generated `managed_mcp_servers.yaml` is derived from saved config. Python SDK tools are in-process; to make the same function available to the managed server expose it over MCP/OpenAPI.
 

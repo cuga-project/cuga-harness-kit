@@ -7,7 +7,7 @@ description: Use when the user wants a cuga agent to ingest, search, or answer q
 
 cuga has a built-in knowledge base: configurable vector/metadata storage (local by default) + **Docling** for parsing/normalizing documents before chunking and embedding, for the default parsing path. Hosted embedding/LLM providers need credentials, and local providers may download models on first use.
 
-The SDK follows installed settings when `enable_knowledge=None`; use `enable_knowledge=True` explicitly for this workflow. When enabled, the SDK auto-injects knowledge tools/awareness so the agent knows what's available and how to search it.
+The SDK follows installed settings when `enable_knowledge=None`; use `enable_knowledge=True` explicitly for this workflow. Also enable `[knowledge].enabled`, `agent_level_enabled`, and `session_level_enabled` in the installed settings for the scopes you need. In the reviewed version, `enable_knowledge=True` injects tools but `agent.knowledge` still enforces those global settings; it does not override a globally disabled knowledge engine. When enabled, the SDK auto-injects knowledge tools/awareness. Validate those tools through an actual invocation before relying on automatic retrieval. In the reviewed source version, the auto-injected search failed with `Unexpected argument(s) for knowledge_search_knowledge: thread_id`; direct `agent.knowledge.search(...)` succeeded. Do not report automatic RAG or citations as working on that version.
 
 This example uses the embedded SDK. For a managed server, configure knowledge and upload documents through Manage/server APIs on the selected agent; use `cuga-managed-server`. Publishing config does not import SDK-process documents into that server.
 
@@ -28,14 +28,12 @@ import asyncio
 async def main():
     agent = CugaAgent(enable_knowledge=True)
     try:
-        await agent.knowledge.ingest("/path/to/quarterly_report.pdf")  # replace with an existing file
-
-        result = await agent.invoke("What does the report say about Q4 revenue?")
-        if result.error:
-            raise RuntimeError(result.error)
-        print(result.answer)  # agent searches the knowledge base automatically
+        ingestion = await agent.knowledge.ingest("/path/to/quarterly_report.pdf")  # replace with an existing file
+        if ingestion.get("status") != "completed" or ingestion.get("failed_files"):
+            raise RuntimeError(ingestion)
 
         results = await agent.knowledge.search("Q4 revenue figures")
+        assert results, "No report passages retrieved"
         for r in results:
             print(f"{r['filename']} (page {r.get('page', '?')}): {r['text'][:100]}")
 
@@ -45,6 +43,8 @@ async def main():
 
 asyncio.run(main())
 ```
+
+Direct ingestion/search is a separate check from agent-generated answers. When testing automatic retrieval, use `track_tool_calls=True`, require a successful `knowledge_search_knowledge` call without tool errors, and verify the returned `sources` against the retrieved documents. `result.error is None` alone does not prove tool execution succeeded. If automatic retrieval is broken, use explicit retrieval and pass the checked passages to a separate answering agent with `enable_knowledge=False`; label source references you construct as application-provided references.
 
 ## Scoping
 

@@ -131,11 +131,14 @@ id: formatter_summary
 name: JSON Summary
 type: output_formatter
 triggers:
-  always: true
+  keywords: [summary]
+  target: agent_response
 format_type: json_schema
 ---
-{"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}
+{"title": "SummaryResponse", "type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}
 ```
+
+Request a `summary` to trigger this formatter. In the reviewed version, `always` policies load but are skipped by the runtime matcher; use a tested keyword trigger. Include a top-level schema `title` so structured output can initialize.
 
 The file loader accepts `format_type: markdown`, `json_schema`, or `direct`; the body is `format_config`. Do not use `format_type: json` or put formatter/guide/guard content only in frontmatter.
 

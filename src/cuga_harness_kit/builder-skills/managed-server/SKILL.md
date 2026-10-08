@@ -17,7 +17,7 @@ Use the URL printed by the launcher (normally `http://localhost:7860`; SSL confi
 
 The following example operates on `cuga-default`. For named agents, first create/select one through Manage and keep the same `agent_id` on every config request. Inspect the current config before editing. For an existing server, prefer section PATCH requests for draft edits. GET responses redact credentials and cannot be used as a complete publish payload. Manage endpoints require a session/token with manage access when authentication is enabled; pass the configured credential via `CUGA_AUTH_TOKEN`. Do not invent an auth route or put secrets in committed config files.
 
-This example deploys a complete config from an authoritative local JSON file specified by `CUGA_CONFIG_FILE`. Prepare that file with the intended agent, LLM, tools, policies and knowledge settings; use server-supported credential references or environment-backed provider credentials. Do not derive it by copying a redacted GET response. Keep files containing secrets out of Git. It requires a running server and an LLM for the smoke query. `/run` separately requires `X-Gateway-Token` matching `CUGA_RUN_TOKEN` (or `GATEWAY_TOKEN`) on the server, or an authenticated chat JWT; set the same shared token on the client before running even when local UI authentication is disabled.
+This example deploys a complete config from an authoritative local JSON file specified by `CUGA_CONFIG_FILE`. Prepare that file with the intended agent, LLM, tools, policies and knowledge settings; use server-supported credential references or environment-backed provider credentials. Do not derive it by copying a redacted GET response. Keep files containing secrets out of Git. It requires a running server and an LLM for the smoke query. `/run` is opt-in: set `CUGA_EVENTS_ENABLED=true` on the server before launching it, along with `CUGA_RUN_TOKEN` (or `GATEWAY_TOKEN`). The token alone does not mount the route. Restart the server after changing these variables, then check that `/openapi.json` advertises `/run`; an HTML fallback or HTTP 200 from `/run/agents` does not prove it is mounted. `/run` separately requires `X-Gateway-Token` matching `CUGA_RUN_TOKEN` (or `GATEWAY_TOKEN`) on the server, or an authenticated chat JWT; set the same shared token on the client before running even when local UI authentication is disabled.
 
 ```python
 import json
@@ -79,11 +79,13 @@ Publish is `POST /api/manage/config`, not `/config/publish`. The body is `{"conf
 
 | Item | Managed shape |
 |---|---|
-| MCP over HTTP | `{"name": "orders", "type": "mcp", "url": "http://localhost:9000/mcp", "transport": "http"}` in `config.tools` |
-| MCP subprocess | `{"name": "orders", "type": "mcp", "command": "uv", "args": ["run", "python", "orders_server.py"], "transport": "stdio", "cwd": "/absolute/project/path"}` |
-| OpenAPI | `{"name": "orders", "type": "openapi", "url": "http://localhost:9000/openapi.json", "include": ["lookupOrder"]}` |
+| MCP over HTTP | `{"name": "orders", "description": "Order lookup tools", "type": "mcp", "url": "http://localhost:9000/mcp", "transport": "http"}` in `config.tools` |
+| MCP subprocess | `{"name": "orders", "description": "Order lookup tools", "type": "mcp", "command": "uv", "args": ["run", "python", "orders_server.py"], "transport": "stdio", "cwd": "/absolute/project/path"}` |
+| OpenAPI | `{"name": "orders", "description": "Order service", "type": "openapi", "url": "http://localhost:9000/openapi.json"}` |
 | Python function | Use an SDK LangChain tool, or expose it as MCP/OpenAPI for the managed server |
 | Policies | Serialized policy objects under `config.policies` (list, or `{"policies": [...]}`); file frontmatter is not the JSON schema |
+
+Supply a nonempty `description` for every managed tool entry. In the reviewed CUGA version, discovery succeeds without one but agent prompt construction fails on `description: null`. Discover callable names from the registry: MCP tools are prefixed with the app name, and OpenAPI callable names can differ from `operation_id`. For MCP, the registry filters `include` against original server tool names before prefixing/sanitizing, while the agent filters callable names/suffixes. A compatible original name such as `lookup_order` can work at both layers; the full `orders_lookup_order` name fails registry filtering. If sanitization makes the original name differ from the callable suffix, omit `include` and restrict the server instead. Verify discovery and execution after saving. For OpenAPI in v0.4.0, omit `include` in the example: the registry filters by exact operation IDs while the agent provider filters the same list by callable names. When those names differ, tools disappear at one of the two layers. Use an API/MCP service exposing only the intended operations when you need restricted exposure; do not claim an `include` list works without checking both discovery and execution.
 
 A serialized keyword guard looks like this; save it into the policies section of the full config and test `delete all records` before publishing:
 
@@ -101,6 +103,8 @@ A serialized keyword guard looks like this; save it into the policies section of
 Registry reload may return `partial` with `tool_errors` even on HTTP 200. Require actual tool discovery and a successful tool call. Verify the resulting production behavior after publish; never report a tool as working just because the config was saved.
 
 ## Invocation and isolation
+
+For the `/run` example, supply `CUGA_RUN_TOKEN` through the server environment, then launch with `CUGA_EVENTS_ENABLED=true uv run cuga start manager`. Use the same token on the client. UI draft chat and `/stream` do not require enabling the events routes.
 
 `POST /run` takes `query`, optional `thread_id`, and optional `agent` selection. It returns `ok`, `status` (`ok`, `error`, or `interrupt`), `answer`, `thread_id`, `sources`, `variables`, and `error`. HTTP 200 alone is not success. Reuse the returned `thread_id` for a conversation and approval resume; use a separate thread when comparing draft and production.
 

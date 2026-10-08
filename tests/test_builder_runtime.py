@@ -369,3 +369,277 @@ def test_run_api_requires_configured_gateway_token(runtime, monkeypatch):
             "/run/agents", headers={"X-Gateway-Token": "harness-test-token"}
         )
         assert response.status_code == 200, response.text
+
+
+def test_run_route_mount_requires_events_flag_and_auth(runtime, monkeypatch):
+    from cuga.backend.server.run_routes import run_api_enabled
+
+    for name in (
+        "GATEWAY_TOKEN",
+        "CUGA_SUPERVISOR_ROSTER",
+        "CUGA_RUN_ALLOW_UNAUTHENTICATED",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("CUGA_RUN_TOKEN", "harness-test-token")
+    monkeypatch.delenv("CUGA_EVENTS_ENABLED", raising=False)
+    assert not run_api_enabled()
+    monkeypatch.setenv("CUGA_EVENTS_ENABLED", "true")
+    assert run_api_enabled()
+    monkeypatch.delenv("CUGA_RUN_TOKEN")
+    assert not run_api_enabled()
+
+
+@pytest.fixture
+def scripted_model(runtime, monkeypatch):
+    from langchain_core.language_models.fake_chat_models import FakeListChatModel
+    from langchain_core.runnables import RunnableLambda
+
+    class ScriptedModel(FakeListChatModel):
+        def _call(self, messages, **kwargs):
+            text = "\n".join(str(m.content) for m in messages)
+            last = str(messages[-1].content)
+            if "Execution output:" in last:
+                return "Fixture execution completed."
+            if "delegate_to_crm" in text and "delegate_to_email" in text:
+                return (
+                    '```python\ncustomers = await delegate_to_crm(task="Get customers")\n'
+                    'email = await delegate_to_email(task="Send a thank-you")\n'
+                    "print(customers)\nprint(email)\n```"
+                )
+            if "get_customers" in text:
+                return "```python\ncustomers = await get_customers(limit=1)\nprint(customers)\n```"
+            if "send_email" in text:
+                return '```python\nmail = await send_email(to="alice@example.test", body="Thank you")\nprint(mail)\n```'
+            if "delete_record" in text:
+                return '```python\ndeleted = await delete_record(record_id="fixture-1")\nprint(deleted)\n```'
+            if "add_numbers" in text:
+                return "```python\nresult = await add_numbers(a=5, b=3)\nprint(result)\n```"
+            return "Fixture response."
+
+        def with_structured_output(self, schema, **kwargs):
+            assert schema["title"] == "SummaryResponse"
+            return RunnableLambda(lambda messages: {"summary": "Fixture summary."})
+
+    from cuga.backend.llm.models import LLMManager
+
+    model = ScriptedModel(responses=["unused"])
+    monkeypatch.setattr(LLMManager, "get_model", lambda *args, **kwargs: model)
+    return model
+
+
+def test_exact_sdk_single_and_supervisor_examples_execute(
+    runtime, scripted_model, tmp_path, monkeypatch
+):
+    from cuga import CugaAgent, CugaSupervisor
+    from cuga.backend.cuga_graph.policy.configurable import PolicyConfigurable
+    from cuga.config import settings
+
+    settings.set("advanced_features.reflection_enabled", False)
+    settings.set("advanced_features.pre_execute_verify_enabled", False)
+    settings.set("advanced_features.sandbox_mode", "local")
+    calls = []
+
+    # Run entire shipped coroutines; replace only provider/storage boundaries.
+    async def check():
+        storage = policy_storage(tmp_path)
+        await storage.initialize_async()
+        system = PolicyConfigurable(storage=storage, llm=scripted_model)
+
+        def configured_agent(**kwargs):
+            for tool in kwargs.get("tools", []):
+                original = tool.func
+                name = tool.name
+
+                def audited(*args, _original=original, _name=name, **kw):
+                    result = _original(*args, **kw)
+                    calls.append((_name, kw, result))
+                    return result
+
+                tool.func = audited
+            return CugaAgent(
+                model=scripted_model,
+                policy_system=system,
+                auto_load_policies=False,
+                filesystem_sync=False,
+                **kwargs,
+            )
+
+        def configured_supervisor(**kwargs):
+            return CugaSupervisor(
+                model=scripted_model,
+                policy_system=system,
+                auto_load_policies=False,
+                filesystem_sync=False,
+                **kwargs,
+            )
+
+        try:
+            for source in blocks("build-agent", "python"):
+                source = (
+                    source.replace("from cuga import CugaAgent, CugaSupervisor\n", "")
+                    .replace("from cuga import CugaAgent\n", "")
+                    .replace("asyncio.run(main())", "")
+                )
+                ns = {
+                    "CugaAgent": configured_agent,
+                    "CugaSupervisor": configured_supervisor,
+                }
+                exec(source, ns)  # noqa: S102 - trusted shipped examples
+                await ns["main"]()
+            assert [x[0] for x in calls] == [
+                "add_numbers",
+                "get_customers",
+                "send_email",
+            ]
+            assert calls[0][1] == {"a": 5, "b": 3}
+            assert calls[0][2] == 8
+        finally:
+            await storage.disconnect()
+
+    asyncio.run(check())
+
+
+def test_documented_approval_pauses_accepts_and_denies(
+    runtime, scripted_model, tmp_path
+):
+    from datetime import datetime
+    from cuga import CugaAgent
+    from cuga.backend.cuga_graph.policy.configurable import PolicyConfigurable
+    from cuga.backend.cuga_graph.nodes.human_in_the_loop.followup_model import (
+        ActionResponse,
+        ActionType,
+    )
+    from langchain_core.tools import tool
+
+    calls = []
+
+    @tool
+    def delete_record(record_id: str) -> str:
+        """Delete a synthetic test record."""
+        calls.append(record_id)
+        return "FIXTURE_RECORD_DELETED"
+
+    async def check():
+        storage = policy_storage(tmp_path)
+        await storage.initialize_async()
+        system = PolicyConfigurable(storage=storage, llm=scripted_model)
+        agent = CugaAgent(
+            tools=[delete_record],
+            model=scripted_model,
+            policy_system=system,
+            enable_knowledge=False,
+            auto_load_policies=False,
+            filesystem_sync=False,
+        )
+        folder = tmp_path / ".cuga" / "tool_approvals"
+        folder.mkdir(parents=True)
+        (folder / "delete.md").write_text(blocks("author-policy", "markdown")[3])
+        try:
+            loaded = await agent.policies.load_from_folder(str(folder.parent))
+            assert loaded["count"] == 1 and not loaded["errors"]
+            for confirmed in (True, False):
+                calls.clear()
+                thread = f"approval-{confirmed}"
+                paused = await agent.invoke("Delete fixture record", thread_id=thread)
+                assert not paused.error and not calls
+                assert any(
+                    d.outcome == "approval_required" for d in paused.policy_decisions
+                )
+                response = ActionResponse(
+                    action_id="tool_approval",
+                    response_type=ActionType.CONFIRMATION,
+                    confirmed=confirmed,
+                    timestamp=datetime.now().isoformat(),
+                )
+                resumed = await agent.invoke(
+                    None,
+                    thread_id=thread,
+                    action_response=response,
+                    track_tool_calls=True,
+                )
+                assert not resumed.error
+                assert calls == (["fixture-1"] if confirmed else [])
+                expected = "approved" if confirmed else "denied"
+                assert any(d.outcome == expected for d in resumed.policy_decisions)
+        finally:
+            await agent.aclose()
+            await storage.disconnect()
+
+    asyncio.run(check())
+
+
+def test_exact_formatter_template_produces_json(runtime, scripted_model, tmp_path):
+    from cuga import CugaAgent
+    from cuga.backend.cuga_graph.policy.configurable import PolicyConfigurable
+
+    async def check():
+        storage = policy_storage(tmp_path)
+        await storage.initialize_async()
+        system = PolicyConfigurable(storage=storage, llm=scripted_model)
+        agent = CugaAgent(
+            model=scripted_model,
+            policy_system=system,
+            enable_knowledge=False,
+            auto_load_policies=False,
+            filesystem_sync=False,
+        )
+        folder = tmp_path / ".cuga" / "output_formatters"
+        folder.mkdir(parents=True)
+        (folder / "summary.md").write_text(blocks("author-policy", "markdown")[4])
+        try:
+            loaded = await agent.policies.load_from_folder(str(folder.parent))
+            assert loaded["count"] == 1 and not loaded["errors"]
+            result = await agent.invoke("Give a summary")
+            assert not result.error
+            assert json.loads(result.answer) == {"summary": "Fixture summary."}
+            assert any(
+                d.policy_id == "formatter_summary" and d.outcome == "applied"
+                for d in result.policy_decisions
+            )
+            other = await agent.invoke("Say hello", thread_id="no-formatter")
+            assert not other.policy_decisions
+        finally:
+            await agent.aclose()
+            await storage.disconnect()
+
+    asyncio.run(check())
+
+
+def test_managed_descriptions_and_openapi_dual_filter_contract(runtime):
+    from cuga.backend.cuga_graph.nodes.cuga_lite.prompt_utils import (
+        format_apps_for_prompt,
+    )
+    from cuga.backend.cuga_graph.nodes.cuga_lite.providers.base import AppDefinition
+    from cuga.backend.cuga_graph.nodes.cuga_lite.providers.combined import (
+        CombinedToolProvider,
+    )
+    from cuga.backend.tools_env.registry.config.config_loader import ServiceConfig
+    from cuga.backend.tools_env.registry.mcp_manager.mcp_manager import MCPManager
+
+    text = (SKILLS_DIR / "managed-server" / "SKILL.md").read_text()
+    rows = re.findall(r"\| (?:MCP over HTTP|MCP subprocess|OpenAPI) \| `(.*?)`", text)
+    entries = [json.loads(row) for row in rows]
+    assert len(entries) == 3 and all(entry["description"] for entry in entries)
+    apps = [
+        AppDefinition(
+            name=entry["name"],
+            url=entry.get("url", ""),
+            description=entry["description"],
+        )
+        for entry in entries
+    ]
+    assert format_apps_for_prompt(apps)
+    assert "include" not in entries[2]
+    schema = {"paths": {"/orders/{order_id}": {"get": {"operationId": "lookupOrder"}}}}
+    manager = MCPManager({})
+    provider = CombinedToolProvider()
+    tool = SimpleNamespace(name="orders_lookuporder")
+    # Registry uses case-sensitive operationId; agent uses the callable name.
+    by_operation = ServiceConfig(include=["lookupOrder"])
+    assert manager._filter_and_override_schema(schema, by_operation)["paths"]
+    assert not provider._filter_tools_by_include([tool], "orders", by_operation.include)
+    by_callable = ServiceConfig(include=[tool.name])
+    assert not manager._filter_and_override_schema(schema, by_callable)["paths"]
+    assert provider._filter_tools_by_include([tool], "orders", by_callable.include) == [
+        tool
+    ]

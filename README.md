@@ -13,8 +13,8 @@ Run `uv tool install cuga-harness-kit`, then `cuga-harness-kit init` in this fol
 The assistant will install this kit, scaffold the cuga guidance files, then suggest the next steps:
 
 1. `uv add cuga` — add cuga to your project.
-2. Create a `.env` — use `docs/cuga-env-api-keys.md` for your LLM provider.
-3. Choose a path: `uv run cuga start demo` for examples, `uv run cuga start manager` for draft/publish configuration, or embed `CugaAgent` in Python.
+2. Follow `using-cuga` to configure your LLM provider and verify a model request; reuse existing server-side LLM config when connecting to a managed server.
+3. Explain what you want to build and choose SDK embedding (usually your own app/UI) or a managed CUGA server (Manage UI, draft/publish config, HTTP clients). A custom UI can use either path.
 4. Ask *"help me build a cuga tool"* or *"how do I add a policy"* when you're ready to build.
 
 ## Manual install
@@ -41,7 +41,8 @@ Run `init` from an empty new project you're starting from scratch, or from insid
 
 | Skill | Teaches |
 |---|---|
-| `getting-started` | Entry point — routes to the right skill below. |
+| `using-cuga` | New-build entry point: verify LLM configuration, understand the goal, choose SDK or managed server with the user. |
+| `getting-started` | Routes focused requests to the appropriate builder skill. |
 | `install-and-launch` | `uv init`, `uv add cuga`, `.env` API keys, `uv run cuga start <mode>`. |
 | `build-agent` | Embedded `CugaAgent` / `CugaSupervisor` SDK basics. |
 | `managed-server` | Manage UI/HTTP draft → test → publish config; production invocation. |

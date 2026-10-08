@@ -5,6 +5,8 @@ description: Use when the user wants to install cuga, start the demo/web UI, or 
 
 # Installing and launching cuga
 
+For first-time application setup, follow `using-cuga` to verify the LLM configuration, understand the user's goal and choose SDK or managed-server mode. Use the installation steps here when that workflow finds CUGA is missing; return to its readiness check after installation. For a specific launch request in an established setup, reuse the chosen mode and provider.
+
 ## Install
 
 For a new app project, initialize with `uv` and add `cuga` as a dependency so it is recorded in `pyproject.toml`:
@@ -17,7 +19,7 @@ uv add cuga
 
 For an existing project that already has a `pyproject.toml`, run `uv add cuga` from the project root. If the user only wants a quick install inside an already-active virtualenv, `uv pip install cuga` is acceptable.
 
-(`cuga` requires Python >= 3.10, < 3.14.) For working inside a checkout of the [cuga-agent](https://github.com/cuga-project/cuga-agent) repo itself instead of the published package:
+The reviewed CUGA v0.4.0 source requires Python >= 3.10, < 3.15; verify the installed version's package metadata before selecting an interpreter. For working inside a checkout of the [cuga-agent](https://github.com/cuga-project/cuga-agent) repo itself instead of the published package:
 
 ```bash
 git clone https://github.com/cuga-project/cuga-agent.git

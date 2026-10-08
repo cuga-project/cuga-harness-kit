@@ -5,7 +5,7 @@ description: Use when the user wants a managed CUGA server, Manage UI, draft tes
 
 # Building with the managed server
 
-The managed server has a separate draft and published config per agent. SDK construction does not update these. Start with `cuga-install-and-launch` for provider credentials, then:
+The managed server has a separate draft and published config per agent. SDK construction does not update these. For a new build, use `using-cuga` to establish LLM readiness and the user's goal/mode first; reuse an existing verified setup. A custom frontend can call this server over HTTP. When integrating with an existing published agent, keep its stored config and use the HTTP invocation/agent selection instructions below; local SDK installation, Manage access and publishing are unnecessary for a client-only integration. Keep provider credentials on the server. Start a new local server with `cuga-install-and-launch`, then:
 
 ```bash
 uv run cuga start manager
@@ -108,10 +108,10 @@ For the `/run` example, supply `CUGA_RUN_TOKEN` through the server environment, 
 
 `POST /run` takes `query`, optional `thread_id`, and optional `agent` selection. It returns `ok`, `status` (`ok`, `error`, or `interrupt`), `answer`, `thread_id`, `sources`, `variables`, and `error`. HTTP 200 alone is not success. Reuse the returned `thread_id` for a conversation and approval resume; use a separate thread when comparing draft and production.
 
-`GET /run/agents` lists available agents. In the reviewed CUGA version, `/run` does not route arbitrary managed agent IDs: `agent` only adds advisory sub-agent guidance in preloaded-supervisor mode. For named managed agents use `/stream` with `X-Agent-ID: <id>` and `X-Use-Draft: true` for draft testing, or use the selected agent's Manage chat. This requires the agent registry feature to be enabled. The `use_draft` example above selects the shared default draft. Check the installed version's `/openapi.json`, `run_routes.py` and stream handler before assuming selector behavior.
+`GET /run/agents` lists available agents. In the reviewed CUGA version, `/run` does not route arbitrary managed agent IDs: `agent` only adds advisory sub-agent guidance in preloaded-supervisor mode. For named managed agents use `/stream` with `X-Agent-ID: <id>`; add `X-Use-Draft: true` for draft testing and omit it for published-agent invocation. Alternatively use the selected agent's Manage chat when you have manage access. Named routing requires the agent registry feature to be enabled. The `use_draft` example above selects the shared default draft. Check the installed version's `/openapi.json`, `run_routes.py` and stream handler before assuming selector behavior.
 
 ## Knowledge and deployment checks
 
 Configure managed knowledge through Manage or supported `cuga knowledge` server commands (`--help` shows current options). SDK `agent.knowledge` belongs to the SDK process. Session uploads attach to the same server `thread_id` used for invocation; agent documents attach to the selected agent. Verify ingestion status, retrieval, and citations. Publish snapshots configuration, not a portable copy of every document or credential; inspect export/import support for deployment.
 
-Before reporting completion, record the installed CUGA version, agent ID, published version, tool/policy checks, and successful production query. Distinguish configuration/storage checks from live LLM/tool/RAG checks. If credentials or services are unavailable, report exactly which checks ran and which did not.
+Before reporting completion, record the CUGA version when available, selected agent ID, successful production query, and tool/policy checks relevant to the requested integration. When changing managed config, also record the published version and draft/production checks. A client-only integration does not need Manage access to inspect or republish config. Distinguish configuration/storage checks from live LLM/tool/RAG checks. If credentials or services are unavailable, report exactly which checks ran and which did not.

@@ -32,6 +32,7 @@ examples that would not load or execute correctly.
 | JSON schema lacked the title required by structured output initialization | Add `title: SummaryResponse` and parse the returned JSON |
 | SDK knowledge flag was described as overriding all settings | Also enable the global engine and intended scopes; direct SDK knowledge operations enforce those settings |
 | Automatic SDK retrieval fails before search | Record `Unexpected argument(s) for knowledge_search_knowledge: thread_id`; remove the unverified automatic-answer claim and document explicit retrieval |
+| New builders needed provider readiness and execution-mode guidance | Added `using-cuga`: reuse existing configuration, verify an actual model request, understand the application goal, and choose SDK or managed server with the user |
 
 ## Reproduce checks
 
@@ -98,10 +99,12 @@ the original 34-test validation scope.
 
 | Check | Result | What executed |
 |---|---|---|
-| Complete opted-in suite | 42 passed; 1 expected failure | All normal, runtime and network checks together |
-| Default harness suite | 29 passed; 14 opt-in checks skipped | Scaffold/migration checks, all four assistant targets, syntax and fenced rendering |
+| Complete opted-in suite | 45 passed; 1 expected failure | All normal, runtime and network checks together, including `using-cuga` onboarding checks |
+| Default harness suite | 30 passed; 16 opt-in checks skipped | Scaffold/migration checks, all four assistant targets, syntax and fenced rendering |
 | Runtime suite, Python 3.12 | 10 passed | Real loaders, SDK graphs, SQLite, policies, Manage routes and authentication |
-| Network suite | 3 passed; 1 expected failure | Launched actual server and registry, exact managed script, three tool transports, knowledge storage and the classified SDK RAG failure |
+| Network suite | 5 passed; 1 expected failure | Launched actual server and registry, exact managed script, model readiness, three tool transports, knowledge storage and the classified SDK RAG failure |
+| `using-cuga` LLM check | Passed with local HTTP fixture | Exact shipped model-factory example completed a real OpenAI-compatible request; a bad endpoint returned 404 and failed without claiming readiness or printing the test key |
+| `using-cuga` routing | Independent simulation passed | Existing FastAPI/React SDK app, React client for an existing named server, and first-time sales assistant; preserve prior checks and avoid unnecessary local SDK/admin setup |
 | SDK single-agent example | Passed | Entire shipped coroutine; arithmetic tool actually called with `a=5`, `b=3`, returned `8` |
 | SDK supervisor example | Passed | Entire shipped coroutine; actual CRM and email fixture functions executed through delegation |
 | Five policy templates | Passed | Exact file blocks loaded and persisted, with body fields checked |

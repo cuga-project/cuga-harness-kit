@@ -354,6 +354,43 @@ def test_knowledge_ingestion_search_and_session_isolation(knowledge_result):
     assert len(data["first"]) == 1 and data["other"] == []
 
 
+@pytest.mark.parametrize("valid_endpoint", [True, False])
+def test_using_cuga_model_check_executes_configured_request(stack, valid_endpoint):
+    source = (SKILLS_DIR / "using-cuga" / "SKILL.md").read_text()
+    examples = re.findall(r"^```python\n(.*?)^```", source, re.MULTILINE | re.DOTALL)
+    assert len(examples) == 1
+    env = dict(stack["env"])
+    if not valid_endpoint:
+        env["OPENAI_BASE_URL"] = stack["model"] + "/missing/v1"
+    run = subprocess.run(
+        [sys.executable, "-c", examples[0]],
+        cwd=stack["root"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    if valid_endpoint:
+        assert run.returncode == 0, run.stderr[-6000:]
+        assert "Configured LLM request succeeded" in run.stdout
+        requests = [
+            json.loads(line)
+            for line in (stack["root"] / "model-requests.jsonl")
+            .read_text()
+            .splitlines()
+        ]
+        assert any(
+            r["model"] == "fixture"
+            and r["messages"][-1]["content"] == "Reply with a short greeting."
+            for r in requests
+        )
+    else:
+        assert run.returncode != 0
+        assert "404" in run.stderr
+        assert "Configured LLM request succeeded" not in run.stdout
+    assert env["OPENAI_API_KEY"] not in run.stdout + run.stderr
+
+
 class AutomaticRagRuntimeFailure(AssertionError):
     pass
 

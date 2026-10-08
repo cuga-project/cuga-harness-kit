@@ -1,16 +1,17 @@
 ---
 name: cuga-getting-started
-description: Use when the user wants to install, launch, or build something with the cuga agent framework (pip package `cuga`), or asks "how do I use cuga" / "how do I build an agent with cuga" — routes to the right cuga-harness-kit skill instead of guessing.
+description: Use to find the appropriate CUGA builder skill for installation, SDK/server setup, tools, policies, runtime skills, knowledge, or troubleshooting. New application setup starts with using-cuga.
 ---
 
 # Getting started with cuga
 
 cuga (`uv add cuga`, [github.com/cuga-project/cuga-agent](https://github.com/cuga-project/cuga-agent)) is an agent orchestration framework: a reasoning engine + pluggable tools (OpenAPI/MCP/LangChain) + a policy system + optional RAG knowledge base + multi-agent supervision, built on LangGraph.
 
-This skill is the entry point. Read the description of the skill that matches what the user is doing before improvising:
+For a new application or first-time setup, start with `using-cuga`: establish LLM readiness, understand the user's build, and choose SDK or managed server with them. For an existing working project, route a focused request directly to the matching skill:
 
 | User is trying to... | Use skill |
 |---|---|
+| Start a new CUGA build, configure an LLM, or choose SDK/server mode | `using-cuga` |
 | Install cuga or start the demo UI | `cuga-install-and-launch` |
 | Configure a managed server, test a draft, publish config, or call HTTP APIs | `cuga-managed-server` |
 | Write Python code that creates/invokes a `CugaAgent` or `CugaSupervisor` | `cuga-build-agent` |
@@ -20,14 +21,14 @@ This skill is the entry point. Read the description of the skill that matches wh
 | Ingest/search documents (RAG) | `cuga-knowledge-rag` |
 | An agent run misbehaved and you need to inspect why | `cuga-debug-trajectory` |
 
-## Choose the execution path first
+## Keep the execution paths separate
 
 | Path | Source of configuration | Next skill |
 |---|---|---|
 | Embedded Python SDK | Your `CugaAgent` / `CugaSupervisor` construction, tools and policy calls | `cuga-build-agent` |
 | Managed server | Per-agent draft and published versions in the config store; Manage UI / HTTP APIs | `cuga-managed-server` |
 
-Ask which path the user needs if it is unclear. Demo presets are examples; SDK code does not automatically configure the managed server. In manager mode, editing `.cuga/` files or the package's registry YAML does not update the saved config. Read the matching skill's full instructions, not just its description.
+Use `using-cuga` when the path is unclear. Demo presets are examples; SDK code does not automatically configure the managed server. In manager mode, editing `.cuga/` files or the package's registry YAML does not update the saved config. Read the matching skill's full instructions, not just its description.
 
 ## Two different meanings of "skill"
 

@@ -5,7 +5,7 @@ description: Use when the user wants to write Python code that creates or invoke
 
 # Building with the CugaAgent SDK
 
-This path embeds CUGA in your Python process. It does not publish configuration to `cuga start manager`; for that use `cuga-managed-server`. Configure your provider using `docs/cuga-env-api-keys.md` first. A model is required for agent reasoning even when tools are local.
+This path embeds CUGA in your Python process, usually as the backend of your own application/UI or an existing Python service. It does not provide a custom UI automatically or publish configuration to `cuga start manager`; for managed configuration use `cuga-managed-server`. For a new build, use `using-cuga` to verify the chosen LLM and establish the user's goal/mode first. Reuse that result when already completed. A model is required for agent reasoning even when tools are local.
 
 ## Single agent
 

@@ -4,16 +4,18 @@ Skills that teach Claude Code, Cursor, Codex, and Bob how to install, launch, an
 
 ## Assistant quickstart
 
-Paste this into Claude Code or Cursor or Bob from the project folder you want to set up:
+Paste this into Claude Code, Cursor, Codex, or Bob from the project folder you want to set up:
 
 ```text
-Run `uv tool install cuga-harness-kit`, then `cuga-harness-kit init` in this folder. Then suggest what I should do next to get cuga running.
+Run `uv tool install --upgrade git+https://github.com/cuga-project/cuga-harness-kit.git`, then `cuga-harness-kit init` in this folder. Read and follow the `using-cuga` skill first: verify my existing LLM configuration or help me configure it, then ask what I want to build and help me choose SDK or managed-server mode before implementation. Reuse choices and successful checks I have already provided.
 ```
 
-The assistant will install this kit, scaffold the cuga guidance files, then suggest the next steps:
+This prompt installs repository main to include the latest builder skills. Published releases can also be installed through PyPI using the commands below.
 
-1. `uv add cuga` — add cuga to your project.
-2. Follow `using-cuga` to configure your LLM provider and verify a model request; reuse existing server-side LLM config when connecting to a managed server.
+The assistant will install this kit, scaffold the cuga guidance files, then follow `using-cuga`:
+
+1. Inspect the existing project and reuse any established provider, execution mode, and successful checks.
+2. Configure your LLM provider and verify a model request. Install CUGA for a local SDK app or local server when needed; use existing server-side configuration for a remote managed-server client.
 3. Explain what you want to build and choose SDK embedding (usually your own app/UI) or a managed CUGA server (Manage UI, draft/publish config, HTTP clients). A custom UI can use either path.
 4. Ask *"help me build a cuga tool"* or *"how do I add a policy"* when you're ready to build.
 

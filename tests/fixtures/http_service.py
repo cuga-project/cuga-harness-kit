@@ -19,6 +19,17 @@ def get_audit():
     return dict(audit)
 
 
+@app.get("/api/ui/config")
+def disabled_registry():
+    return {"agent_registry": False}
+
+
+@app.post("/stream")
+def unexpected_stream():
+    audit["unexpected_stream_calls"] += 1
+    return {"error": "This fixture must not receive a named-agent invocation"}
+
+
 @app.get("/orders/{order_id}", operation_id="lookupOrder")
 def lookup_order(order_id: str):
     audit["openapi_calls"] += 1
@@ -69,7 +80,7 @@ def answer(data):
         f.write(json.dumps(data) + "\n")
     if data.get("response_format", {}).get("type") == "json_schema":
         return json.dumps({"summary": "Fixture summary"})
-    if "Execution output:" in last or "Execution Output:" in last:
+    if last.startswith(("Execution output:", "Execution Output:")):
         if "knowledge_search_knowledge" in text and "42 million" in last:
             return "Q4 revenue was 42 million dollars [s1]."
         return "Fixture result: " + last[-500:]
@@ -83,14 +94,28 @@ def answer(data):
         return "```python\nresult = await add_numbers(a=5, b=3)\nprint(result)\n```"
     if "knowledge_search_knowledge" in text and "Q4 revenue" in last:
         return '```python\nreport = await knowledge_search_knowledge(query="Q4 revenue Atlas", scope="agent")\nprint(report)\n```'
-    if "delegate_to_crm" in text and "delegate_to_email" in text:
-        return '```python\ncustomer_result = await delegate_to_crm(task="Get the top customer")\nemail_result = await delegate_to_email(task="Send a thank-you to alice@example.test")\nprint(customer_result)\nprint(email_result)\n```'
-    if "get_customers" in text:
+    crm_delegate = re.search(r"### `(?P<name>delegate_to_[\w]*crm[\w]*)\(", text)
+    email_delegate = re.search(r"### `(?P<name>delegate_to_[\w]*email[\w]*)\(", text)
+    if crm_delegate and email_delegate:
         return (
-            "```python\ncustomers = await get_customers(limit=1)\nprint(customers)\n```"
+            f'```python\ncustomer_result = await {crm_delegate["name"]}(task="Get the top customer")\n'
+            f'email_result = await {email_delegate["name"]}(task=f"Send a thank-you using this CRM result: {{customer_result}}")\n'
+            "print(customer_result)\nprint(email_result)\n```"
         )
-    if "send_email" in text:
-        return '```python\nmail_result = await send_email(to="alice@example.test", body="Thank you")\nprint(mail_result)\n```'
+    crm_tool = re.search(r"\b((?:crm_tools_)?get_customers)\b", text)
+    if crm_tool:
+        return f"```python\ncustomers = await {crm_tool[0]}(limit=1)\nprint(customers)\n```"
+    email_tool = re.search(r"\b((?:email_tools_)?send_email)\b", text)
+    if email_tool:
+        contact = re.search(r"[\w.+-]+@[\w.-]+", last)
+        record = re.search(r"CRM_RECORD_\w+", last)
+        if not contact or not record:
+            return "CRM output missing; cannot send an email."
+        phase = "EMAIL_DRAFT" if "EMAIL_DRAFT" in text else "EMAIL_PUBLISHED"
+        return (
+            f'```python\nmail_result = await {email_tool[0]}(to="{contact[0]}", '
+            f'body="Thank you for {record[0]} {phase}")\nprint(mail_result)\n```'
+        )
     if "delete_record" in text:
         return '```python\ndeleted = await delete_record(record_id="fixture-1")\nprint(deleted)\n```'
     match = re.search(r"using (orders_\w+)", last)

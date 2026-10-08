@@ -13,7 +13,7 @@ GETTING_STARTED = SKILLS_DIR / "getting-started" / "SKILL.md"
 
 def test_all_skills_have_required_frontmatter():
     skill_paths = _skill_dirs()
-    assert len(skill_paths) == 10
+    assert len(skill_paths) == 11
     for skill_path in skill_paths:
         frontmatter, body = parse_skill_md(skill_path / "SKILL.md")
         assert frontmatter["name"], skill_path
@@ -104,18 +104,19 @@ def test_all_targets_include_managed_workflow_and_preserve_examples(tmp_path):
     assert "# My Skill" in agents
 
 
-def test_new_entry_skill_is_available_on_all_targets(tmp_path):
+@pytest.mark.parametrize("skill_name", ["using-cuga", "build-supervisor"])
+def test_new_skills_are_available_on_all_targets(tmp_path, skill_name):
     from cuga_harness_kit.cli import init
 
     init(["claude", "cursor", "codex", "bob"], force=False, dry_run=False, cwd=tmp_path)
-    skill = SKILLS_DIR / "using-cuga" / "SKILL.md"
+    skill = SKILLS_DIR / skill_name / "SKILL.md"
     assert (
-        tmp_path / ".claude/skills/using-cuga/SKILL.md"
+        tmp_path / f".claude/skills/{skill_name}/SKILL.md"
     ).read_bytes() == skill.read_bytes()
     assert (
-        tmp_path / ".bob/skills/using-cuga/SKILL.md"
+        tmp_path / f".bob/skills/{skill_name}/SKILL.md"
     ).read_bytes() == skill.read_bytes()
-    assert (tmp_path / ".cursor/rules/cuga-using-cuga.mdc").read_text() == render_mdc(
-        skill
-    )
+    assert (
+        tmp_path / f".cursor/rules/cuga-{skill_name}.mdc"
+    ).read_text() == render_mdc(skill)
     assert render_agents_section(skill) in (tmp_path / "AGENTS.md").read_text()

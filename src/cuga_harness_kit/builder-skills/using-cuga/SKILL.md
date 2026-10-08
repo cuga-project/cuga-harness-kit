@@ -77,7 +77,7 @@ If the request fails, report the redacted error and address its actual cause: cr
 
 ## 2. Understand what the user wants to build
 
-Once readiness is established, ask what the agent should do and how people will use it, unless the user has already explained this. For example: “What do you want to build with CUGA, and will users access it through your own app/UI, the CUGA UI, or another service?” Identify the needed tools, documents and integrations from that goal.
+Once readiness is established, ask what the agent should do and how people will use it, unless the user has already explained this. For example: “What do you want to build with CUGA, and will users access it through your own app/UI, the CUGA UI, or another service?” Identify the needed tools, documents and integrations from that goal. Determine whether one agent can handle it or the user needs a supervisor coordinating specialists; multi-agent composition stays within the chosen SDK/server path.
 
 ## 3. Choose SDK or managed server with the user
 
@@ -95,4 +95,4 @@ A custom UI generally makes SDK embedding a useful recommendation, but it can al
 | SDK | `cuga-build-agent`; keep the user's chosen app/UI architecture |
 | Managed server | `cuga-managed-server`; distinguish local authoritative JSON, saved draft and published config |
 
-Read the selected skill's full instructions. SDK construction and local `.cuga/` files do not automatically update managed-server config. Add the matching tool, policy, runtime-skill or knowledge skill when the user's build needs it. Report the provider/model checked, readiness evidence, selected mode and concrete next implementation step without exposing credentials.
+For a supervisor or multiple specialist agents, also follow `cuga-build-supervisor` in the selected mode. Read the selected skill's full instructions. SDK construction and local `.cuga/` files do not automatically update managed-server config. Add the matching tool, policy, runtime-skill or knowledge skill when the user's build needs it. Report the provider/model checked, readiness evidence, selected mode and concrete next implementation step without exposing credentials.

@@ -398,18 +398,24 @@ def scripted_model(runtime, monkeypatch):
         def _call(self, messages, **kwargs):
             text = "\n".join(str(m.content) for m in messages)
             last = str(messages[-1].content)
-            if "Execution output:" in last:
-                return "Fixture execution completed."
+            if last.startswith("Execution output:"):
+                return "Fixture execution completed: " + last
             if "delegate_to_crm" in text and "delegate_to_email" in text:
                 return (
                     '```python\ncustomers = await delegate_to_crm(task="Get customers")\n'
-                    'email = await delegate_to_email(task="Send a thank-you")\n'
+                    'email = await delegate_to_email(task=f"Send a thank-you using {customers}")\n'
                     "print(customers)\nprint(email)\n```"
                 )
             if "get_customers" in text:
                 return "```python\ncustomers = await get_customers(limit=1)\nprint(customers)\n```"
             if "send_email" in text:
-                return '```python\nmail = await send_email(to="alice@example.test", body="Thank you")\nprint(mail)\n```'
+                contact = re.search(r"[\w.+-]+@[\w.-]+", last)
+                record = re.search(r"CRM_RECORD_\w+", last)
+                assert contact and record, "CRM output must reach the email agent"
+                return (
+                    f'```python\nmail = await send_email(to="{contact[0]}", '
+                    f'body="Thank you for {record[0]}")\nprint(mail)\n```'
+                )
             if "delete_record" in text:
                 return '```python\ndeleted = await delete_record(record_id="fixture-1")\nprint(deleted)\n```'
             if "add_numbers" in text:
@@ -474,7 +480,10 @@ def test_exact_sdk_single_and_supervisor_examples_execute(
             )
 
         try:
-            for source in blocks("build-agent", "python"):
+            for source in (
+                blocks("build-agent", "python")
+                + blocks("build-supervisor", "python")[:1]
+            ):
                 source = (
                     source.replace("from cuga import CugaAgent, CugaSupervisor\n", "")
                     .replace("from cuga import CugaAgent\n", "")
@@ -493,6 +502,9 @@ def test_exact_sdk_single_and_supervisor_examples_execute(
             ]
             assert calls[0][1] == {"a": 5, "b": 3}
             assert calls[0][2] == 8
+            assert calls[1][1] == {"limit": 1}
+            assert calls[2][1]["to"] == "alice@example.test"
+            assert "CRM_RECORD_7" in calls[2][1]["body"]
         finally:
             await storage.disconnect()
 
@@ -643,3 +655,25 @@ def test_managed_descriptions_and_openapi_dual_filter_contract(runtime):
     assert provider._filter_tools_by_include([tool], "orders", by_callable.include) == [
         tool
     ]
+
+
+def test_managed_supervisor_demo_seed_creates_specialists_and_published_refs(runtime):
+    from cuga.backend.server.config_store import load_config, load_draft
+    from cuga.backend.server.demo_manage_setup import _seed_supervisor_demo_config_async
+
+    async def check():
+        await _seed_supervisor_demo_config_async()
+        supervisor, version = await load_config(None, "team-supervisor")
+        assert version.isdigit()
+        assert supervisor["agent"]["kind"] == "supervisor"
+        refs = [entry["ref"] for entry in supervisor["supervisor"]["subAgents"]]
+        assert refs == ["crm-agent", "email-agent", "filesystem-agent"]
+        for agent_id in [*refs, "team-supervisor"]:
+            draft = await load_draft(agent_id)
+            published, version = await load_config(None, agent_id)
+            assert draft["agent"] == published["agent"]
+            assert version.isdigit()
+        filesystem, _ = await load_config(None, "filesystem-agent")
+        assert filesystem["advanced_features"]["enable_filesystem_tools"] is True
+
+    asyncio.run(check())

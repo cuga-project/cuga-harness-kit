@@ -14,7 +14,8 @@ For a new application or first-time setup, start with `using-cuga`: establish LL
 | Start a new CUGA build, configure an LLM, or choose SDK/server mode | `using-cuga` |
 | Install cuga or start the demo UI | `cuga-install-and-launch` |
 | Configure a managed server, test a draft, publish config, or call HTTP APIs | `cuga-managed-server` |
-| Write Python code that creates/invokes a `CugaAgent` or `CugaSupervisor` | `cuga-build-agent` |
+| Write Python code that creates/invokes a single `CugaAgent` | `cuga-build-agent` |
+| Compose a multi-agent supervisor in the SDK, Manage, or a supervisor demo | `cuga-build-supervisor` |
 | Author a new **runtime** skill the agent itself can load (`.cuga/skills/<name>/SKILL.md`) | `cuga-build-cuga-skill` |
 | Register a Python function, OpenAPI spec, or MCP server as a callable tool | `cuga-build-tool` |
 | Add a policy: block an intent, add a playbook, require approval, enhance a tool description, or reshape output | `cuga-author-policy` |

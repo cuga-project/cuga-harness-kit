@@ -99,14 +99,18 @@ the original 34-test validation scope.
 
 | Check | Result | What executed |
 |---|---|---|
-| Complete opted-in suite | 45 passed; 1 expected failure | All normal, runtime and network checks together, including `using-cuga` onboarding checks |
-| Default harness suite | 30 passed; 16 opt-in checks skipped | Scaffold/migration checks, all four assistant targets, syntax and fenced rendering |
-| Runtime suite, Python 3.12 | 10 passed | Real loaders, SDK graphs, SQLite, policies, Manage routes and authentication |
-| Network suite | 5 passed; 1 expected failure | Launched actual server and registry, exact managed script, model readiness, three tool transports, knowledge storage and the classified SDK RAG failure |
+| Complete opted-in suite | 48 passed; 1 expected failure | All normal, runtime and network checks together, including onboarding and SDK/managed supervisor checks |
+| Default harness suite | 31 passed; 18 opt-in checks skipped | Scaffold/migration checks, all 11 skills across four assistant targets, syntax and fenced rendering |
+| Runtime suite, Python 3.12 | 11 passed | Real loaders, SDK graphs, SQLite, policies, Manage routes and authentication |
+| Network suite | 6 passed; 1 expected failure | Launched actual server and registry, exact managed script, model readiness, three tool transports, knowledge storage and the classified SDK RAG failure |
 | `using-cuga` LLM check | Passed with local HTTP fixture | Exact shipped model-factory example completed a real OpenAI-compatible request; a bad endpoint returned 404 and failed without claiming readiness or printing the test key |
 | `using-cuga` routing | Independent simulation passed | Existing FastAPI/React SDK app, React client for an existing named server, and first-time sales assistant; preserve prior checks and avoid unnecessary local SDK/admin setup |
 | SDK single-agent example | Passed | Entire shipped coroutine; arithmetic tool actually called with `a=5`, `b=3`, returned `8` |
-| SDK supervisor example | Passed | Entire shipped coroutine; actual CRM and email fixture functions executed through delegation |
+| SDK supervisor example | Passed | Entire moved `build-supervisor` coroutine; CRM output passed to email, with recipient and customer-record arguments checked |
+| Managed supervisor | Passed with launched server/MCP fixtures | Exact config shapes and invocation example; named creation/routing, specialist publication, five CRM-to-email executions, draft instruction isolation, independent specialist publication and disabled-registry rejection |
+| Named draft tool catalog | Confirmed limitation | A newly created named draft answered without executing its draft-only CRM tool; published definitions plus a scoped registry reload provisioned the catalog after the initial draft query cached it empty; catalog checks after named tool publication are required |
+| Supervisor CLI entry points | Help verified | Installed CLI advertises `demo_supervisor` and `--seed-supervisor-demo`; no demo services launched by this check |
+| Supervisor demo seed | Passed | Real seed function stored CRM/email/filesystem specialists and supervisor as drafts and published versions; internal references and filesystem flag checked |
 | Five policy templates | Passed | Exact file blocks loaded and persisted, with body fields checked |
 | Intent guard | Passed | Exact shipped guard coroutine blocked matching input; nonmatching input did not match |
 | Tool approval/resume | Passed | Shipped approval file interrupted; accept on the same thread executed once; deny executed zero times |
@@ -121,10 +125,12 @@ the original 34-test validation scope.
 | Runtime skill | Passed | Exact runtime skill template discovered and loaded through SkillRegistry |
 | CLI/package | Initial review passed | Real CLI help, source/wheel builds and installed scaffolds for all four targets |
 
-No usable hosted LLM credential was available. Real LLM reasoning and routing
+These checks used local model fixtures rather than a hosted LLM. Real LLM reasoning and routing
 quality, hosted embedding-provider compatibility/quality, PDF/DOCX/image parsing,
 OCR, managed knowledge upload/RAG, external A2A/ACP delegation, authenticated
-Manage/JWT flows, and deployment export/import remain unvalidated. The UI check
+Manage/JWT flows, deployment export/import, and full CLI-launch-to-chat supervisor
+demos remain unvalidated. The supervisor demo seed was executed against isolated
+storage; it does not establish that every bundled demo tool or model works. The UI check
 used the same scripted HTTP provider. SDK automatic RAG is a confirmed runtime
 failure, not merely an unavailable-credentials check. Do not report all paths as
 working, or citations as verified, on this reviewed source version.

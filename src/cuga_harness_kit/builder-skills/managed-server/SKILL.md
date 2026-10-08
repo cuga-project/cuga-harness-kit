@@ -13,6 +13,8 @@ uv run cuga start manager
 
 Use the URL printed by the launcher (normally `http://localhost:7860`; SSL configuration may enable HTTPS). Open Manage, configure the agent name, LLM, tools, policies, and knowledge, test in draft chat, then Publish. Production chat uses the published version. Manager stores configuration in its config database and generates managed registry YAML; do not edit the installed package's YAML or `.cuga/` policy files to update it.
 
+For multiple specialists coordinated by a named supervisor, follow `cuga-build-supervisor` for agent creation, internal ID references, draft/production behavior and delegation checks.
+
 ## HTTP configuration workflow
 
 The following example operates on `cuga-default`. For named agents, first create/select one through Manage and keep the same `agent_id` on every config request. Inspect the current config before editing. For an existing server, prefer section PATCH requests for draft edits. GET responses redact credentials and cannot be used as a complete publish payload. Manage endpoints require a session/token with manage access when authentication is enabled; pass the configured credential via `CUGA_AUTH_TOKEN`. Do not invent an auth route or put secrets in committed config files.

@@ -65,6 +65,7 @@ def stack(tmp_path_factory):
             "OPENAI_BASE_URL": model_base + "/v1",
             "MODEL_NAME": "fixture",
             "CUGA_DBS_DIR": str(root / "dbs"),
+            "CUGA_LOGGING_DIR": str(root / "logs"),
             "MAC_USER_DATA_PATH": str(root / "logs"),
             "DYNACONF_STORAGE__LOCAL_DB_PATH": str(root / "dbs" / "cuga.db"),
             "DYNACONF_STORAGE__MODE": "local",
@@ -327,6 +328,7 @@ def knowledge_result(stack):
         "DYNACONF_KNOWLEDGE__RAG_PROFILE": "speed",
         "CUGA_KNOWLEDGE_WORKER_DIR": str(root),
         "CUGA_DBS_DIR": str(root / "dbs"),
+        "CUGA_LOGGING_DIR": str(root / "logs"),
         "DYNACONF_STORAGE__LOCAL_DB_PATH": str(root / "sdk.db"),
     }
     log = root / "worker.log"
@@ -409,3 +411,153 @@ def test_automatic_rag_tool_execution_and_citations(knowledge_result):
     assert not errors, errors
     assert answer["sources"] and "42 million" in answer["answer"], answer
     assert answer["sources"][0]["filename"] == "quarterly_report.txt"
+
+
+def test_managed_supervisor_delegates_and_keeps_draft_out_of_production(stack):
+    text = (SKILLS_DIR / "build-supervisor" / "SKILL.md").read_text()
+    configs = [
+        json.loads(row)
+        for row in re.findall(r"^```json\n(.*?)^```", text, re.MULTILINE | re.DOTALL)
+    ]
+    assert len(configs) == 3
+    client = stack["client"]
+    ids = []
+    for cfg in configs:
+        created = checked(client.post("/api/agents", json=cfg["agent"]))
+        ids.append(created["id"])
+        if cfg["agent"]["kind"] == "single":
+            cfg["tools"][0]["url"] = f"http://127.0.0.1:{stack['mcp_port']}/mcp"
+            cfg["llm"] = config(stack)["llm"]
+        checked(
+            client.post(
+                "/api/manage/config/draft",
+                params={"agent_id": created["id"]},
+                json={"config": cfg},
+            )
+        )
+    assert [entry["ref"] for entry in configs[2]["supervisor"]["subAgents"]] == ids[:2]
+    source = re.findall(r"^```python\n(.*?)^```", text, re.MULTILINE | re.DOTALL)[1]
+
+    def invoke(draft, expected_marker):
+        calls_path = stack["root"] / "supervisor-calls.jsonl"
+        before = calls_path.read_text().splitlines() if calls_path.exists() else []
+        run = subprocess.run(
+            [sys.executable, "-c", source],
+            cwd=stack["root"],
+            env={
+                **stack["env"],
+                "CUGA_SUPERVISOR_ID": ids[2],
+                "CUGA_USE_DRAFT": str(draft).lower(),
+            },
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        assert run.returncode == 0, run.stdout[-4000:] + run.stderr[-4000:]
+        after = calls_path.read_text().splitlines() if calls_path.exists() else []
+        calls = [json.loads(line) for line in after[len(before) :]]
+        assert [call["tool"] for call in calls] == ["get_customers", "send_email"], (
+            run.stdout[-6000:]
+        )
+        assert calls[0]["limit"] == 1
+        assert calls[1]["to"] == calls[0]["contact"]
+        assert calls[0]["record"] in calls[1]["body"]
+        assert expected_marker in calls[1]["body"]
+        assert "EMAIL_EXECUTED" in run.stdout
+        assert "event: Answer" in run.stdout
+        assert "event: Error" not in run.stdout
+
+    # A newly created named draft reads the published tool catalog in v0.4.0.
+    # Probe this explicitly so the skill cannot promise draft-only tool execution.
+    prepublish = subprocess.run(
+        [sys.executable, "-c", source],
+        cwd=stack["root"],
+        env={**stack["env"], "CUGA_SUPERVISOR_ID": ids[0], "CUGA_USE_DRAFT": "true"},
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert prepublish.returncode == 0, prepublish.stderr[-4000:]
+    assert "event: Answer" in prepublish.stdout
+    assert not (stack["root"] / "supervisor-calls.jsonl").exists()
+    # Publish specialists before composing the production team.
+    for agent_id, cfg in zip(ids[:2], configs[:2]):
+        checked(
+            client.post(
+                "/api/manage/config",
+                params={"agent_id": agent_id},
+                json={"config": cfg},
+            )
+        )
+    import httpx
+
+    # The first draft invocation cached an empty published CRM catalog.
+    stale = httpx.get(
+        stack["registry"] + "/apis", params={"agent_id": ids[0]}, timeout=30
+    )
+    stale.raise_for_status()
+    assert "crm_tools" not in stale.json()
+    checked(
+        httpx.post(
+            stack["registry"] + "/reload", params={"agent_id": ids[0]}, timeout=30
+        )
+    )
+    refreshed = httpx.get(
+        stack["registry"] + "/apis", params={"agent_id": ids[0]}, timeout=30
+    )
+    refreshed.raise_for_status()
+    assert any("get_customers" in name for name in refreshed.json()["crm_tools"])
+    invoke(True, "EMAIL_PUBLISHED")
+    published = checked(
+        client.post(
+            "/api/manage/config",
+            params={"agent_id": ids[2]},
+            json={"config": configs[2]},
+        )
+    )
+    assert published["version"].isdigit()
+    invoke(False, "EMAIL_PUBLISHED")
+    # Change a specialist draft while keeping production intact.
+    configs[1]["special_instructions"] += " Include EMAIL_DRAFT in the email body."
+    checked(
+        client.post(
+            "/api/manage/config/draft",
+            params={"agent_id": ids[1]},
+            json={"config": configs[1]},
+        )
+    )
+    invoke(True, "EMAIL_DRAFT")
+    invoke(False, "EMAIL_PUBLISHED")
+    checked(
+        client.post(
+            "/api/manage/config",
+            params={"agent_id": ids[1]},
+            json={"config": configs[1]},
+        )
+    )
+    invoke(False, "EMAIL_DRAFT")
+    # The exact skill client must reject disabled named routing before invocation.
+    disabled = subprocess.run(
+        [sys.executable, "-c", source],
+        cwd=stack["root"],
+        env={
+            **stack["env"],
+            "CUGA_BASE_URL": stack["model"],
+            "CUGA_SUPERVISOR_ID": ids[2],
+        },
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert disabled.returncode != 0
+    assert "refusing default-agent fallback" in disabled.stderr
+
+    assert (
+        httpx.get(stack["model"] + "/audit").json().get("unexpected_stream_calls", 0)
+        == 0
+    )
+    # Unknown named routing must fail rather than execute the default agent.
+    response = client.post(
+        "/stream", headers={"X-Agent-ID": "missing-team"}, json={"query": "hi"}
+    )
+    assert response.status_code == 404

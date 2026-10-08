@@ -44,6 +44,8 @@ Valid `<service>` values: `demo`, `demo_skills`, `demo_crm`, `demo_docs`, `demo_
 - `registry` — just the tool registry service (OpenAPI/MCP config), no chat UI.
 - `appworld` / `travel_agent` — specific benchmark/example scenarios.
 
+For a multi-agent demo, use `cuga-build-supervisor`: it covers `demo_supervisor` and `manager --seed-supervisor-demo`, including fixed-ID seeding and model/tool checks.
+
 Other useful commands:
 - `cuga stop <service>` — stop a running service.
 - `cuga status` — show what's currently running.

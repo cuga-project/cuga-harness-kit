@@ -46,7 +46,8 @@ Run `init` from an empty new project you're starting from scratch, or from insid
 | `using-cuga` | New-build entry point: verify LLM configuration, understand the goal, choose SDK or managed server with the user. |
 | `getting-started` | Routes focused requests to the appropriate builder skill. |
 | `install-and-launch` | `uv init`, `uv add cuga`, `.env` API keys, `uv run cuga start <mode>`. |
-| `build-agent` | Embedded `CugaAgent` / `CugaSupervisor` SDK basics. |
+| `build-agent` | Embedded single-agent `CugaAgent` SDK basics. |
+| `build-supervisor` | SDK and managed multi-agent teams, specialist ID references, delegation, draft/publish checks and supervisor demos. |
 | `managed-server` | Manage UI/HTTP draft → test → publish config; production invocation. |
 | `build-cuga-skill` | Authoring cuga's own **runtime** skills — not the same as the IDE-assistant skills in this repo. |
 | `build-tool` | Registering a LangChain / OpenAPI / MCP tool. |

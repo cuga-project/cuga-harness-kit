@@ -7,10 +7,10 @@ Skills that teach Claude Code, Cursor, Codex, and Bob how to install, launch, an
 Paste this into Claude Code, Cursor, Codex, or Bob from the project folder you want to set up:
 
 ```text
-Run `uv tool install --upgrade git+https://github.com/cuga-project/cuga-harness-kit.git`, then `cuga-harness-kit init` in this folder. Read and follow the full `using-cuga` skill.
+Run `uv tool install --upgrade cuga-harness-kit`, then `cuga-harness-kit init` in this folder. Read and follow the full `using-cuga` skill.
 ```
 
-This prompt installs repository main to include the latest builder skills. Published releases can also be installed through PyPI using the commands below.
+This prompt installs the latest published release from PyPI.
 
 The assistant will install this kit, scaffold the cuga guidance files, then follow `using-cuga`:
 

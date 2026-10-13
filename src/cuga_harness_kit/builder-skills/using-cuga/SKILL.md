@@ -18,16 +18,19 @@ Identify where this application gets its LLM configuration:
 | Local SDK or new local server | Project environment / `.env`, selected model settings, or the SDK's explicit `model=` instance |
 | Existing managed server | The selected agent's saved LLM config and server-side credentials; the local client does not need its own provider key |
 
-Preserve an existing provider and model. If none is selected, ask which provider the user wants: WatsonX, OpenAI, or another supported provider. Ask for provider/model choices and missing configuration names; have the user place credential values in their local `.env` or supported server secret configuration. Never ask them to paste API keys into chat, print credential values, or overwrite an existing `.env`.
+Preserve an existing provider and model. If none is selected, ask which provider the user wants: IBM Bob inference, WatsonX, OpenAI, or another supported provider. Ask for provider/model choices and missing configuration names; have the user place credential values in their local `.env` or supported server secret configuration. Never ask them to paste API keys into chat, print credential values, or overwrite an existing `.env`.
 
 For environment-based setup, use the installed provider settings and this reference:
 
 | Provider | `AGENT_SETTING_CONFIG` | Required configuration |
 |---|---|---|
+| IBM Bob inference | `settings.bob.toml` | `OPENAI_API_KEY="Apikey <bob api key>"`, `OPENAI_BASE_URL="https://api.us-east.bob.ibm.com/inference/v1"`, chosen Bob `MODEL_NAME` |
 | WatsonX | `settings.watsonx.toml` | `WATSONX_API_KEY`, `WATSONX_URL`, `WATSONX_PROJECT_ID` or `WATSONX_SPACE_ID`, chosen `MODEL_NAME` |
 | OpenAI | `settings.openai.toml` | `OPENAI_API_KEY`, chosen `MODEL_NAME` |
 | OpenAI-compatible endpoint | `settings.openai.toml` | Endpoint's key, `OPENAI_BASE_URL`, endpoint's `MODEL_NAME` |
 | Azure OpenAI, Groq, OpenRouter | Matching bundled settings file | Use the provider-specific variables in `docs/cuga-env-api-keys.md`; verify the installed settings |
+
+For IBM Bob inference, read the dedicated section in `docs/cuga-env-api-keys.md`. Verify that the installed CUGA includes `settings.bob.toml`: it supplies the required `Authorization` and `User-Agent` headers. The generic OpenAI preset does not supply those headers. Check that `LLM_AUTH_HEADER` is unset in the launching process, because it overrides the preset with Bearer authentication. Bob coding-assistant setup and `BOBSHELL_API_KEY` do not configure CUGA inference. Use the model request check below to verify the chosen Bob model and credentials.
 
 Keep provider credentials on the application's Python backend or CUGA server; a browser UI calls that backend/server and must not receive the provider key. Keep `.env` and config files containing credentials out of Git. Check configuration presence without displaying secrets. A present key, successful import, or constructed model does not establish that authentication and inference work.
 

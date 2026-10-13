@@ -90,7 +90,7 @@ def test_all_targets_include_managed_workflow_and_preserve_examples(tmp_path):
     for path in (
         tmp_path / ".claude/skills/managed-server/SKILL.md",
         tmp_path / ".bob/skills/managed-server/SKILL.md",
-        tmp_path / ".cursor/rules/cuga-managed-server.mdc",
+        tmp_path / ".cursor/skills/cuga-managed-server/SKILL.md",
         tmp_path / "AGENTS.md",
     ):
         content = path.read_text()
@@ -110,6 +110,7 @@ def test_new_skills_are_available_on_all_targets(tmp_path, skill_name):
 
     init(["claude", "cursor", "codex", "bob"], force=False, dry_run=False, cwd=tmp_path)
     skill = SKILLS_DIR / skill_name / "SKILL.md"
+    frontmatter, _ = parse_skill_md(skill)
     assert (
         tmp_path / f".claude/skills/{skill_name}/SKILL.md"
     ).read_bytes() == skill.read_bytes()
@@ -117,6 +118,6 @@ def test_new_skills_are_available_on_all_targets(tmp_path, skill_name):
         tmp_path / f".bob/skills/{skill_name}/SKILL.md"
     ).read_bytes() == skill.read_bytes()
     assert (
-        tmp_path / f".cursor/rules/cuga-{skill_name}.mdc"
-    ).read_text() == render_mdc(skill)
+        tmp_path / f".cursor/skills/{frontmatter['name']}/SKILL.md"
+    ).read_bytes() == skill.read_bytes()
     assert render_agents_section(skill) in (tmp_path / "AGENTS.md").read_text()

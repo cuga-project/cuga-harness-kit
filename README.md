@@ -34,7 +34,7 @@ If you're installing inside an already-active virtualenv instead of as a CLI too
 Run `init` from an empty new project you're starting from scratch, or from inside an existing cuga checkout — either way it writes the same skill set into the current directory:
 
 - `.claude/skills/<name>/SKILL.md` — auto-discovered by Claude Code.
-- `.cursor/rules/cuga-<name>.mdc` — auto-discovered by Cursor.
+- `.cursor/skills/<skill-name>/SKILL.md` — native Cursor skills; directory names match each skill's frontmatter `name` (for example `cuga-build-agent` or `using-cuga`).
 - `AGENTS.md` — read by Codex. Re-running `init` only touches the managed block, so it won't clobber the rest of the file.
 - `.bob/skills/<name>/SKILL.md` — auto-discovered by IBM Bob.
 - `docs/cuga-env-api-keys.md` — local reference for `.env` API-key setup.
@@ -55,7 +55,7 @@ Run `init` from an empty new project you're starting from scratch, or from insid
 | `knowledge-rag` | Document ingestion/search. |
 | `debug-trajectory` | `cuga viz`, `cuga doctor`, common failure patterns. |
 
-Each is authored once as a `SKILL.md` under `src/cuga_harness_kit/builder-skills/`, then rendered into the Cursor/Codex shapes (or used verbatim for Claude/Bob) at `init` time.
+Each is authored once as a `SKILL.md` under `src/cuga_harness_kit/builder-skills/`, then used verbatim for Claude, Cursor and Bob or rendered into Codex `AGENTS.md` sections at `init` time.
 
 ## CLI
 
@@ -104,6 +104,18 @@ cuga-harness-kit update
 ```
 
 `update` overwrites scaffolded files unconditionally — if you hand-edited one to customize it, `update` will clobber that edit (there's no diff/merge, except for `AGENTS.md`'s managed block). Copy customizations out first if you want to keep them.
+
+### Cursor rules to skills
+
+Starting with 0.2.0, the Cursor target writes native skills instead of `.mdc` rules. To migrate an existing project after upgrading the package:
+
+```bash
+cuga-harness-kit init --targets cursor
+```
+
+After each native skill is installed, byte-identical generated `.cursor/rules/cuga-<name>.mdc` files are removed. Older or edited rules (including newline-only differences) are moved to inactive `.mdc.bak` files (or `.mdc.bak.1`, etc. when a backup already exists); the CLI reports their paths so you can transfer customizations into the new skills. Unrelated rules are left alone. Legacy rules reached through a symlinked file, `.cursor`, or `rules` directory are retained and reported for manual migration.
+
+`init` preserves an existing native skill that differs, and leaves its legacy rule active until you resolve the conflict. `update --targets cursor` replaces differing native skills as usual. Use `init --targets cursor --dry-run` to preview writes, removals and backups without changing files.
 
 ## cuga project setup
 

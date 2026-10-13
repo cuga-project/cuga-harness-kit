@@ -1,10 +1,7 @@
-"""Render a canonical Claude SKILL.md into Cursor .mdc or a Codex AGENTS.md section.
+"""Render canonical skills into Codex AGENTS.md sections.
 
-Claude and Bob both read skills as a per-skill directory + SKILL.md with
-frontmatter, so those two targets use the SKILL.md file verbatim. Cursor
-(single rule file + frontmatter) and Codex (one shared file, no frontmatter)
-need different shapes, which are derived from the canonical SKILL.md here,
-at scaffold time, so there's a single source of truth per skill.
+Claude, Cursor and Bob use SKILL.md verbatim. The legacy Cursor .mdc renderer
+is retained only to recognize generated rules when migrating to native skills.
 """
 
 from __future__ import annotations
@@ -31,7 +28,7 @@ def parse_skill_md(skill_md_path: Path) -> tuple[dict, str]:
 
 
 def render_mdc(skill_md_path: Path) -> str:
-    """SKILL.md -> Cursor .mdc content: same description, alwaysApply: false, body verbatim."""
+    """Reconstruct the legacy Cursor rule for migration comparison."""
     frontmatter, body = parse_skill_md(skill_md_path)
     header = yaml.safe_dump(
         {"description": frontmatter["description"], "alwaysApply": False},

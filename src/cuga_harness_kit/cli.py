@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from cuga_harness_kit import dispatch, migration
-from cuga_harness_kit.render import render_agents_section, render_mdc
+from cuga_harness_kit.render import parse_skill_md, render_agents_section, render_mdc
 
 SKILLS_DIR = Path(__file__).parent / "builder-skills"
 DOCS_DIR = Path(__file__).parent / "docs"
@@ -30,20 +30,54 @@ def _detect_cuga_message(cwd: Path) -> str:
     return "No existing cuga installation detected — skills will guide you through `uv init` and `uv add cuga` from scratch."
 
 
-def _write_file(path: Path, content: str, *, force: bool, dry_run: bool, written: list[str], skipped: list[str]) -> None:
+def _write_file(path: Path, content: str | bytes, *, force: bool, dry_run: bool, written: list[str], skipped: list[str]) -> bool:
+    """Return whether the requested content is installed, or would be in a dry run."""
     if path.exists():
-        if path.read_text() == content:
+        existing = path.read_bytes() if isinstance(content, bytes) else path.read_text()
+        if existing == content:
             skipped.append(f"{path} (already up to date)")
-            return
+            return True
         if not force:
             skipped.append(f"{path} (exists, differs — pass --force to overwrite)")
-            return
+            return False
     if dry_run:
         written.append(f"{path} (dry-run)")
-        return
+        return True
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content)
+    if isinstance(content, bytes):
+        path.write_bytes(content)
+    else:
+        path.write_text(content)
     written.append(str(path))
+    return True
+
+
+def _retire_cursor_rule(
+    cwd: Path, src: Path, *, dry_run: bool, migrated: list[str], skipped: list[str]
+) -> None:
+    """Retire only this kit's legacy filename after its native skill is available."""
+    legacy = cwd / ".cursor" / "rules" / f"cuga-{src.parent.name}.mdc"
+    if not legacy.exists() and not legacy.is_symlink():
+        return
+    if any(path.is_symlink() for path in (legacy, legacy.parent, legacy.parent.parent)):
+        skipped.append(f"{legacy} (symlink — migrate manually)")
+        return
+    if not legacy.is_file():
+        return
+    suffix = " (dry-run)" if dry_run else ""
+    if legacy.read_bytes() == render_mdc(src).encode("utf-8"):
+        if not dry_run:
+            legacy.unlink()
+        migrated.append(f"{legacy} (removed matching generated rule){suffix}")
+        return
+    backup = legacy.with_name(legacy.name + ".bak")
+    index = 1
+    while backup.exists() or backup.is_symlink():
+        backup = legacy.with_name(f"{legacy.name}.bak.{index}")
+        index += 1
+    if not dry_run:
+        legacy.rename(backup)
+    migrated.append(f"{legacy} -> {backup} (older or edited rule; review customizations){suffix}")
 
 
 def _write_agents_md(cwd: Path, skill_paths: list[Path], *, dry_run: bool, written: list[str], skipped: list[str]) -> None:
@@ -86,6 +120,7 @@ def init(
     skill_paths = _skill_dirs()
     written: list[str] = []
     skipped: list[str] = []
+    migrated: list[str] = []
 
     print(_detect_cuga_message(cwd))
 
@@ -99,8 +134,13 @@ def init(
         if "cursor" in targets:
             for skill_path in skill_paths:
                 src = skill_path / "SKILL.md"
-                dest = cwd / ".cursor" / "rules" / f"cuga-{skill_path.name}.mdc"
-                _write_file(dest, render_mdc(src), force=force, dry_run=dry_run, written=written, skipped=skipped)
+                frontmatter, _ = parse_skill_md(src)
+                dest = cwd / ".cursor" / "skills" / frontmatter["name"] / "SKILL.md"
+                installed = _write_file(
+                    dest, src.read_bytes(), force=force, dry_run=dry_run, written=written, skipped=skipped
+                )
+                if installed:
+                    _retire_cursor_rule(cwd, src, dry_run=dry_run, migrated=migrated, skipped=skipped)
 
         if "codex" in targets:
             _write_agents_md(cwd, [p / "SKILL.md" for p in skill_paths], dry_run=dry_run, written=written, skipped=skipped)
@@ -141,6 +181,8 @@ def init(
         print(f"  wrote:    {line}")
     for line in skipped:
         print(f"  skipped:  {line}")
+    for line in migrated:
+        print(f"  migrated: {line}")
     if with_migration:
         print(
             '\nNext step: cp .env.example .env, add a source repo under migration_from/<name>/, then '

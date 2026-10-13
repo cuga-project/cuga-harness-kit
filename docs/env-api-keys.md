@@ -10,6 +10,7 @@ Bundled model settings live in cuga under `src/cuga/configurations/models/`:
 
 - `settings.groq.toml` for Groq.
 - `settings.openai.toml` for OpenAI and OpenAI-compatible endpoints such as LiteLLM.
+- `settings.bob.toml` for IBM Bob inference, with its required custom headers.
 - `settings.azure.toml` for Azure OpenAI.
 - `settings.watsonx.toml` for WatsonX.
 - `settings.openrouter.toml` for OpenRouter.
@@ -44,6 +45,29 @@ OPENAI_BASE_URL="https://api.example.com/v1"
 MODEL_NAME="gpt-4o"
 AGENT_SETTING_CONFIG="settings.openai.toml"
 ```
+
+## IBM Bob inference
+
+Use CUGA's `settings.bob.toml` preset for Bob's OpenAI-compatible inference endpoint. Confirm that the installed CUGA contains `configurations/models/settings.bob.toml`; if it is missing, upgrade to a CUGA version that includes it before continuing.
+
+```env
+OPENAI_API_KEY="Apikey <bob api key>"
+OPENAI_BASE_URL="https://api.us-east.bob.ibm.com/inference/v1"
+MODEL_NAME="premium"
+AGENT_SETTING_CONFIG="settings.bob.toml"
+```
+
+Replace `<bob api key>` locally with a key authorized for Bob inference, preserving the `Apikey ` prefix. Choose a Bob model available to your account, such as `premium` or `fast`; preserve an existing model choice.
+
+| Setting | Why it matters |
+|---|---|
+| `OPENAI_API_KEY` | Contains the full `Authorization: Apikey <bob api key>` header value; Bob rejects Bearer authentication |
+| `settings.bob.toml` | Sets `Authorization` from `OPENAI_API_KEY` and `User-Agent` to `pi-bob/0.2.2`; Bob rejects the default OpenAI SDK User-Agent |
+| `LLM_AUTH_HEADER` | Must be unset in the launching process, including exported shell/service variables; it takes precedence over the preset and forces Bearer authentication |
+
+`BOBSHELL_API_KEY` authenticates the Bob CLI in the migration pipeline. It does not automatically configure CUGA inference, and using Bob as the coding assistant does not select it as CUGA's LLM provider.
+
+Load the project `.env` before importing CUGA, for example with `uv run --env-file .env python app.py` or `uv run --env-file .env cuga start manager`. Follow `using-cuga` to verify an actual model request; a present key or a successful import does not establish inference readiness. For an existing remote managed server, configure credentials on that server and verify the selected agent through its UI/HTTP API.
 
 ## Azure OpenAI
 
